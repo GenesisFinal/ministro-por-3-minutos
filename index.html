@@ -375,6 +375,26 @@
           });
         } catch {}
       }
+      playPositiveShock() {
+        if (this.muted) return;
+        try {
+          this.init();
+          if (!this.ctx) return;
+          const now = this.ctx.currentTime;
+          [440, 554.37, 659.25].forEach((freq, idx) => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, now + idx * 0.12);
+            gain.gain.setValueAtTime(0.1, now + idx * 0.12);
+            gain.gain.exponentialRampToValueAtTime(0.005, now + idx * 0.12 + 0.22);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now + idx * 0.12);
+            osc.stop(now + idx * 0.12 + 0.22);
+          });
+        } catch {}
+      }
       playDefaultSiren() {
         if (this.muted) return;
         try {
@@ -694,10 +714,11 @@
       },
     ];
 
-    const SHOCKS_AT_120 = [
+    const ALL_SHOCKS = [
       {
         id: 'sequia_historica',
-        badge: 'ALERTA CLIMÁTICA Y EXTERNA · MINUTO 02:00',
+        type: 'negative',
+        badge: 'SHOCK EXTERNO NEGATIVO · CLIMA',
         title: 'Sequía Histórica en la Zona Núcleo',
         description: 'Una ola de calor extrema destruye el 40% de la cosecha de soja y maíz. Se desploman las exportaciones del complejo agroindustrial y caen los ingresos fiscales por Retenciones.',
         icon: 'CloudOff',
@@ -705,7 +726,7 @@
           {
             id: 'absorber_sequia',
             label: 'Absorber el Golpe Fiscal',
-            subtitle: 'Pierdes 0.60% del PBI en ingresos por Retenciones y -5 de Actividad.',
+            subtitle: 'Pierdes -0.60% del PBI en ingresos por Retenciones y -5 de Actividad.',
             effects: {
               fiscalDelta: -0.60,
               pazDelta: 0,
@@ -730,7 +751,8 @@
       },
       {
         id: 'fallo_judicial_jubilaciones',
-        badge: 'REVÉS JUDICIAL · MINUTO 02:00',
+        type: 'negative',
+        badge: 'SHOCK INTERNO NEGATIVO · JUSTICIA',
         title: 'Fallo de la Corte Suprema por Haberes Jubilatorios',
         description: 'La Corte Suprema declara inconstitucional el rezago de la fórmula previsional y ordena recomponer de inmediato los haberes jubilatorios en todo el país.',
         icon: 'Scale',
@@ -738,10 +760,10 @@
           {
             id: 'acatar_fallo',
             label: 'Acatar el Fallo y Recomponer Haberes',
-            subtitle: 'Debes sumar +0.40% del PBI al gasto de Jubilaciones (+4 Paz Social).',
+            subtitle: 'Suma +0.40% del PBI al gasto de Jubilaciones (+5 Paz Social).',
             effects: {
               fiscalDelta: 0,
-              pazDelta: 4,
+              pazDelta: 5,
               actividadDelta: 2,
               sliderAdjust: { blockId: 'jubilaciones', delta: 0.40 },
               news: 'URGENTE: Economía acata el fallo de la Corte y suma 0.40% del PBI en gasto previsional.',
@@ -761,12 +783,10 @@
           },
         ],
       },
-    ];
-
-    const SHOCKS_AT_60 = [
       {
         id: 'corrida_cambiaria_fmi',
-        badge: 'CRISIS CAMBIARIA · MINUTO 01:00',
+        type: 'negative',
+        badge: 'SHOCK FINANCIERO NEGATIVO · MERCADOS',
         title: 'Corrida Cambiaria y Ultimátum del FMI',
         description: 'Se dispara el dólar financiero un 22% en dos ruedas. El FMI exige acelerar el ajuste con un apretón monetario inmediato o se desata una espiral cambiaria.',
         icon: 'TrendingDown',
@@ -799,7 +819,8 @@
       },
       {
         id: 'paro_general_cgt',
-        badge: 'TENSIÓN SINDICAL · MINUTO 01:00',
+        type: 'negative',
+        badge: 'SHOCK SOCIAL NEGATIVO · SINDICATOS',
         title: 'Paro General por Tiempo Indeterminado',
         description: 'Las centrales sindicales y el transporte de cargas anuncian un paro nacional con bloqueo de refinerías y puertos ante el ajuste en curso.',
         icon: 'Siren',
@@ -830,7 +851,165 @@
           },
         ],
       },
+      {
+        id: 'boom_soja_commodities',
+        type: 'positive',
+        badge: 'SHOCK EXTERNO POSITIVO · VIENTO DE COLA',
+        title: 'Boom de Commodities: "Súper Soja" a USD 600',
+        description: 'Se disparan los precios internacionales de los granos en Chicago junto a una cosecha récord en la Pampa Húmeda. Ingresa una lluvia extraordinaria de divisas y recaudación.',
+        icon: 'Wheat',
+        choices: [
+          {
+            id: 'blindar_tesoro',
+            label: 'Ahorrar Todo el Excedente en el Tesoro',
+            subtitle: 'Mejora +0.65% del PBI el Resultado Fiscal y suma +4 puntos de Actividad Económica.',
+            effects: {
+              fiscalDelta: 0.65,
+              pazDelta: 2,
+              actividadDelta: 4,
+              sliderAdjust: null,
+              news: 'VIENTO DE COLA: Récord de liquidación agroexportadora inyecta +0.65% del PBI directo a las arcas del Tesoro.',
+            },
+          },
+          {
+            id: 'alivio_consumo_agro',
+            label: 'Repartir Dividendo Social y Crédito Productivo',
+            subtitle: 'Suma +0.30% del PBI al Resultado Fiscal, +10 de Paz Social y +8 de Actividad.',
+            effects: {
+              fiscalDelta: 0.30,
+              pazDelta: 10,
+              actividadDelta: 8,
+              sliderAdjust: null,
+              news: 'VIENTO DE COLA: El boom exportador financia líneas de crédito y alivio en alimentos, impulsando calle y actividad.',
+            },
+          },
+        ],
+      },
+      {
+        id: 'boom_vaca_muerta_litio',
+        type: 'positive',
+        badge: 'SHOCK ENERGÉTICO POSITIVO · SUPERÁVIT',
+        title: 'Hito en Vaca Muerta y Boom de Litio',
+        description: 'Se inaugura antes de plazo el nuevo gasoducto troncal y entran en producción tres plantas de litio en el NOA. Se desploma la importación de energía y crecen las regalías.',
+        icon: 'Zap',
+        choices: [
+          {
+            id: 'capturar_renta_energetica',
+            label: 'Capturar Ahorro Fiscal y Regalías',
+            subtitle: 'Suma +0.55% del PBI al Resultado Fiscal y +7 puntos de Actividad Económica.',
+            effects: {
+              fiscalDelta: 0.55,
+              pazDelta: 2,
+              actividadDelta: 7,
+              sliderAdjust: null,
+              news: 'HITO ENERGÉTICO: La balanza energética pasa a fuerte superávit y ahorra 0.55% del PBI en divisas y subsidios.',
+            },
+          },
+          {
+            id: 'abaratar_tarifa_industrial',
+            label: 'Bonificar Tarifas a Hogares e Industria',
+            subtitle: 'Suma +0.25% del PBI al Resultado Fiscal, +11 de Actividad y +9 de Paz Social.',
+            effects: {
+              fiscalDelta: 0.25,
+              pazDelta: 9,
+              actividadDelta: 11,
+              sliderAdjust: null,
+              news: 'HITO ENERGÉTICO: El gas de Vaca Muerta abarata costos industriales y alivia las boletas residenciales.',
+            },
+          },
+        ],
+      },
+      {
+        id: 'baja_tasas_fed_inversiones',
+        type: 'positive',
+        badge: 'SHOCK FINANCIERO POSITIVO · MERCADOS',
+        title: 'La FED Baja Tasas y Cae 400 bps el Riesgo País',
+        description: 'La Reserva Federal de EE.UU. recorta tasas de interés y se desata una ola de euforia hacia mercados emergentes. Caen los rendimientos de la deuda y entran capitales frescos.',
+        icon: 'TrendingUp',
+        choices: [
+          {
+            id: 'canje_deuda_alivio',
+            label: 'Ejecutar Canje Voluntario de Deuda',
+            subtitle: 'Descomprime intereses: +0.50% del PBI en Resultado Fiscal, +6 Actividad y +4 Paz Social.',
+            effects: {
+              fiscalDelta: 0.50,
+              pazDelta: 4,
+              actividadDelta: 6,
+              sliderAdjust: null,
+              news: 'EUFORIA EN BONOS: Exitoso canje de deuda despeja vencimientos y ahorra 0.50% del PBI al Tesoro.',
+            },
+          },
+          {
+            id: 'credito_hipotecario_pyme',
+            label: 'Fondear Boom de Crédito Privado y Obras',
+            subtitle: 'Suma +0.20% del PBI Fiscal y dispara +14 puntos la Actividad Económica y +6 la Paz Social.',
+            effects: {
+              fiscalDelta: 0.20,
+              pazDelta: 6,
+              actividadDelta: 14,
+              sliderAdjust: null,
+              news: 'LLUVIA DE INVERSIONES: El desplome del Riesgo País reactiva el crédito bancario y la inversión privada.',
+            },
+          },
+        ],
+      },
+      {
+        id: 'acuerdo_pacto_fiscal',
+        type: 'positive',
+        badge: 'SHOCK INSTITUCIONAL POSITIVO · CONSENSO',
+        title: 'Acuerdo Bipartidista y Digitalización del Estado',
+        description: 'Una auditoría tecnológica detecta filtraciones y compras duplicadas mientras el Congreso aprueba por amplia mayoría un paquete de simplificación tributaria y formalización.',
+        icon: 'Sparkles',
+        choices: [
+          {
+            id: 'podar_filtraciones',
+            label: 'Eliminar Compras Duplicadas y Filtraciones',
+            subtitle: 'Ahorro limpio sin costo social: +0.45% del PBI Fiscal y +9 puntos de Paz Social.',
+            effects: {
+              fiscalDelta: 0.45,
+              pazDelta: 9,
+              actividadDelta: 3,
+              sliderAdjust: null,
+              news: 'AUDITORÍA HISTÓRICA: La digitalización de compras públicas ahorra 0.45% del PBI con fuerte apoyo ciudadano.',
+            },
+          },
+          {
+            id: 'blanqueo_formalizacion',
+            label: 'Lanzar Moratoria y Formalización PyME',
+            subtitle: 'Recaudación rápida y oxígeno productivo: +0.35% del PBI Fiscal y +11 de Actividad.',
+            effects: {
+              fiscalDelta: 0.35,
+              pazDelta: 5,
+              actividadDelta: 11,
+              sliderAdjust: null,
+              news: 'RÉCORD DE FORMALIZACIÓN: El pacto fiscal suma contribuyentes y oxigena la actividad comercial.',
+            },
+          },
+        ],
+      },
     ];
+
+    function generateRandomShockSchedule() {
+      const randInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+      const times = [
+        randInt(118, 150),
+        randInt(68, 102),
+        randInt(22, 52),
+      ];
+      const positives = ALL_SHOCKS.filter((s) => s.type === 'positive').sort(() => Math.random() - 0.5);
+      const negatives = ALL_SHOCKS.filter((s) => s.type === 'negative').sort(() => Math.random() - 0.5);
+      const picked = [
+        positives[0],
+        negatives[0],
+        Math.random() < 0.5 ? positives[1] : negatives[1],
+      ].sort(() => Math.random() - 0.5);
+
+      return times.map((triggerTime, idx) => ({
+        triggerTime,
+        triggered: false,
+        shock: picked[idx],
+      }));
+    }
 
     // --- COMPONENTS ---
     function StickyCrisisHeader({
@@ -1281,28 +1460,58 @@
 
     function ShockModal({ shock, onSelectChoice }) {
       if (!shock) return null;
+      const isPositive = shock.type === 'positive';
       return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md">
-          <div className="relative w-full max-w-lg rounded-2xl bg-slate-900 border-2 border-rose-500/80 shadow-[0_0_50px_rgba(225,29,72,0.45)] overflow-hidden">
-            <div className="bg-rose-600 px-4 py-2 flex items-center justify-between text-white">
+          <div
+            className={`relative w-full max-w-lg rounded-2xl bg-slate-900 border-2 overflow-hidden ${
+              isPositive
+                ? 'border-emerald-500/80 shadow-[0_0_50px_rgba(16,185,129,0.4)]'
+                : 'border-rose-500/80 shadow-[0_0_50px_rgba(225,29,72,0.45)]'
+            }`}
+          >
+            <div
+              className={`px-4 py-2 flex items-center justify-between text-white ${
+                isPositive ? 'bg-emerald-600' : 'bg-rose-600'
+              }`}
+            >
               <div className="flex items-center gap-2">
-                <Icon name="AlertOctagon" className="w-5 h-5 animate-bounce" />
+                <Icon
+                  name={isPositive ? 'Sparkles' : 'AlertOctagon'}
+                  className={`w-5 h-5 ${isPositive ? 'animate-spin' : 'animate-bounce'}`}
+                />
                 <span className="font-mono text-xs sm:text-sm font-black tracking-wider uppercase">
-                  ALERTA DE ÚLTIMO MOMENTO · RELOJ EN PAUSA
+                  {isPositive
+                    ? '¡VIENTO DE COLA EXTERNO! · RELOJ EN PAUSA'
+                    : 'ALERTA DE ÚLTIMO MOMENTO · RELOJ EN PAUSA'}
                 </span>
               </div>
-              <span className="text-[11px] font-mono bg-rose-950/60 px-2 py-0.5 rounded font-bold">
-                DECISIÓN OBLIGATORIA
+              <span
+                className={`text-[11px] font-mono px-2 py-0.5 rounded font-bold ${
+                  isPositive ? 'bg-emerald-950/60' : 'bg-rose-950/60'
+                }`}
+              >
+                {isPositive ? 'OPORTUNIDAD' : 'DECISIÓN URGENTE'}
               </span>
             </div>
 
             <div className="p-5 sm:p-6">
               <div className="flex items-start gap-3.5 mb-4">
-                <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/40 text-rose-400 shrink-0">
+                <div
+                  className={`p-3 rounded-xl border shrink-0 ${
+                    isPositive
+                      ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400'
+                      : 'bg-rose-500/15 border-rose-500/40 text-rose-400'
+                  }`}
+                >
                   <Icon name={shock.icon} className="w-7 h-7" />
                 </div>
                 <div>
-                  <span className="inline-block text-[11px] font-mono font-bold uppercase tracking-wider text-amber-400 mb-0.5">
+                  <span
+                    className={`inline-block text-[11px] font-mono font-bold uppercase tracking-wider mb-0.5 ${
+                      isPositive ? 'text-emerald-400' : 'text-amber-400'
+                    }`}
+                  >
                     {shock.badge}
                   </span>
                   <h2 className="text-lg sm:text-xl font-black text-slate-100 leading-snug">
@@ -1317,19 +1526,32 @@
 
               <div className="space-y-3">
                 <p className="text-xs font-mono uppercase tracking-wider text-slate-400 font-bold">
-                  Elige tu respuesta como Ministro:
+                  {isPositive
+                    ? '¿Cómo aprovecharás este shock positivo?'
+                    : 'Elige tu respuesta ante la crisis:'}
                 </p>
                 {shock.choices.map((choice) => (
                   <button
                     key={choice.id}
                     onClick={() => onSelectChoice(choice)}
-                    className="w-full text-left p-3.5 sm:p-4 rounded-xl bg-slate-950 hover:bg-slate-800/90 border border-slate-700/80 hover:border-amber-400 transition-all group cursor-pointer"
+                    className={`w-full text-left p-3.5 sm:p-4 rounded-xl bg-slate-950 hover:bg-slate-800/90 border border-slate-700/80 transition-all group cursor-pointer ${
+                      isPositive ? 'hover:border-emerald-400' : 'hover:border-amber-400'
+                    }`}
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="font-bold text-sm sm:text-base text-slate-100 group-hover:text-amber-300 transition-colors">
+                      <span
+                        className={`font-bold text-sm sm:text-base text-slate-100 transition-colors ${
+                          isPositive ? 'group-hover:text-emerald-300' : 'group-hover:text-amber-300'
+                        }`}
+                      >
                         {choice.label}
                       </span>
-                      <Icon name="ArrowRight" className="w-4 h-4 text-slate-400 group-hover:text-amber-400 shrink-0" />
+                      <Icon
+                        name="ArrowRight"
+                        className={`w-4 h-4 text-slate-400 shrink-0 ${
+                          isPositive ? 'group-hover:text-emerald-400' : 'group-hover:text-amber-400'
+                        }`}
+                      />
                     </div>
                     <p className="text-xs text-slate-400 mt-1 leading-snug">
                       {choice.subtitle}
@@ -1534,7 +1756,7 @@
       return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md overflow-y-auto">
           <div className="relative w-full max-w-lg rounded-2xl bg-slate-900 border border-slate-700/80 shadow-[0_0_60px_rgba(0,0,0,0.8)] overflow-hidden my-auto">
-            <div className="bg-gradient-to-r from-rose-600 via-amber-500 to-rose-600 h-1.5 w-full" />
+            <div className="bg-gradient-to-r from-rose-600 via-amber-500 to-emerald-500 h-1.5 w-full" />
             <div className="p-5 sm:p-6">
               <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-300 font-mono text-[11px] font-bold uppercase mb-3">
                 <Icon name="AlertTriangle" className="w-3.5 h-3.5 text-rose-400" />
@@ -1583,7 +1805,9 @@
               <div className="mt-4 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center gap-2 text-xs text-amber-200">
                 <Icon name="Clock" className="w-4 h-4 text-amber-400 shrink-0" />
                 <span>
-                  Prepárate: a los <strong>02:00</strong> y <strong>01:00</strong> enfrentarás shocks externos en tiempo real.
+                  <strong>Shocks Imprevistos:</strong> En momentos aleatorios caerán shocks externos tanto{' '}
+                  <span className="text-emerald-300 font-semibold">positivos (viento de cola)</span> como{' '}
+                  <span className="text-rose-300 font-semibold">negativos (crisis)</span>.
                 </span>
               </div>
 
@@ -1614,9 +1838,8 @@
       const [values, setValues] = useState(buildInitialValues);
       const [isDefaulted, setIsDefaulted] = useState(false);
 
+      const [shockSchedule, setShockSchedule] = useState(() => generateRandomShockSchedule());
       const [activeShock, setActiveShock] = useState(null);
-      const [triggered120, setTriggered120] = useState(false);
-      const [triggered60, setTriggered60] = useState(false);
       const [shockModifiers, setShockModifiers] = useState({ fiscal: 0, paz: 0, actividad: 0 });
       const [shockHistory, setShockHistory] = useState([]);
 
@@ -1728,19 +1951,23 @@
       }, [gameStatus, activeShock, metrics, triggerVictory]);
 
       useEffect(() => {
-        if (gameStatus !== 'playing') return;
-        if (timeLeft === 120 && !triggered120) {
-          setTriggered120(true);
-          const randomShock = SHOCKS_AT_120[Math.floor(Math.random() * SHOCKS_AT_120.length)];
-          setActiveShock(randomShock);
-          soundFX.playShockAlert();
-        } else if (timeLeft === 60 && !triggered60) {
-          setTriggered60(true);
-          const randomShock = SHOCKS_AT_60[Math.floor(Math.random() * SHOCKS_AT_60.length)];
-          setActiveShock(randomShock);
-          soundFX.playShockAlert();
+        if (gameStatus !== 'playing' || activeShock !== null) return;
+        const dueIndex = shockSchedule.findIndex(
+          (item) => !item.triggered && timeLeft === item.triggerTime
+        );
+        if (dueIndex !== -1) {
+          const dueItem = shockSchedule[dueIndex];
+          setShockSchedule((prev) =>
+            prev.map((item, idx) => (idx === dueIndex ? { ...item, triggered: true } : item))
+          );
+          setActiveShock(dueItem.shock);
+          if (dueItem.shock.type === 'positive') {
+            soundFX.playPositiveShock();
+          } else {
+            soundFX.playShockAlert();
+          }
         }
-      }, [timeLeft, triggered120, triggered60, gameStatus]);
+      }, [timeLeft, shockSchedule, gameStatus, activeShock]);
 
       const handleSliderChange = (blockId, newValue) => {
         if (gameStatus !== 'playing') return;
@@ -1788,7 +2015,7 @@
         if (news) setLatestNews(news);
         setShockHistory((prev) => [
           ...prev,
-          { shockTitle: activeShock.title, choiceLabel: choice.label, time: timeLeft },
+          { shockTitle: activeShock.title, shockType: activeShock.type, choiceLabel: choice.label, time: timeLeft },
         ]);
         soundFX.playTick(620, 0.05, 0.07);
         setActiveShock(null);
@@ -1799,8 +2026,7 @@
         setValues(buildInitialValues());
         setIsDefaulted(false);
         setTimeLeft(INITIAL_STATE.timerSeconds);
-        setTriggered120(false);
-        setTriggered60(false);
+        setShockSchedule(generateRandomShockSchedule());
         setActiveShock(null);
         setShockModifiers({ fiscal: 0, paz: 0, actividad: 0 });
         setShockHistory([]);
@@ -1872,16 +2098,21 @@
             </div>
 
             {shockHistory.length > 0 && (
-              <div className="mb-4 flex flex-wrap items-center gap-2 p-2.5 rounded-xl bg-rose-950/30 border border-rose-500/30">
-                <span className="text-[11px] font-mono font-bold uppercase text-rose-300 flex items-center gap-1">
-                  Shocks Enfrentados:
+              <div className="mb-4 flex flex-wrap items-center gap-2 p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
+                <span className="text-[11px] font-mono font-bold uppercase text-slate-300 flex items-center gap-1">
+                  Shocks del Mandato:
                 </span>
                 {shockHistory.map((item, idx) => (
                   <span
                     key={idx}
-                    className="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-900/90 text-slate-300 border border-slate-700"
+                    className={`text-[11px] font-mono px-2 py-0.5 rounded border ${
+                      item.shockType === 'positive'
+                        ? 'bg-emerald-950/50 text-emerald-200 border-emerald-500/40'
+                        : 'bg-rose-950/50 text-rose-200 border-rose-500/40'
+                    }`}
                   >
-                    {item.shockTitle}: <strong className="text-amber-300">{item.choiceLabel}</strong>
+                    {item.shockType === 'positive' ? '🟢 ' : '🔴 '}
+                    {item.shockTitle}: <strong>{item.choiceLabel}</strong>
                   </span>
                 ))}
               </div>
@@ -1969,7 +2200,7 @@
                     <span>Informe Reservado del Viceministro</span>
                   </div>
                   <p className="leading-relaxed text-slate-400">
-                    Recortar <strong className="text-slate-200">Cargos Políticos</strong> te da aire en la opinión pública (+10 Paz Social), pero apenas ahorra 0.13% del PBI. Para cerrar la brecha de <strong className="text-rose-400">-4.00%</strong> deberás combinar recortes estructurales sin apagar el motor productivo.
+                    Recortar <strong className="text-slate-200">Cargos Políticos</strong> te da aire en la opinión pública (+10 Paz Social), pero apenas ahorra 0.13% del PBI. Mantén margen de seguridad: los shocks externos caen sin aviso previo.
                   </p>
                 </div>
               </section>
@@ -2004,6 +2235,7 @@
             <IntroModal
               onStart={() => {
                 soundFX.playTick(660, 0.06, 0.08);
+                setShockSchedule(generateRandomShockSchedule());
                 setGameStatus('playing');
               }}
             />

@@ -1,0 +1,2034 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Ministro por 3 Minutos | Simulador de Crisis Fiscal</title>
+  <meta name="description" content="Asume como Ministro de Economía por 180 segundos. Lleva el déficit fiscal de -4.00% del PBI a 0.00% sin que estalle la Paz Social ni colapse la Actividad Económica." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+            mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+          },
+        },
+      },
+    };
+  </script>
+
+  <!-- React 18 + ReactDOM 18 + Babel + Canvas Confetti -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+
+  <style>
+    body {
+      background-color: #020617;
+      background-image:
+        radial-gradient(at 50% 0%, rgba(30, 41, 59, 0.55) 0px, transparent 60%),
+        linear-gradient(to right, rgba(30, 41, 59, 0.18) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(30, 41, 59, 0.18) 1px, transparent 1px);
+      background-size: 100% 100%, 28px 28px, 28px 28px;
+    }
+
+    input[type="range"].crisis-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 10px;
+      border-radius: 9999px;
+      outline: none;
+      cursor: pointer;
+      touch-action: pan-y;
+    }
+
+    input[type="range"].crisis-slider:disabled {
+      cursor: not-allowed;
+      opacity: 0.45;
+    }
+
+    input[type="range"].crisis-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #f8fafc;
+      border: 3px solid #0f172a;
+      box-shadow: 0 0 0 2px rgba(248, 250, 252, 0.4), 0 4px 10px rgba(0, 0, 0, 0.6);
+      cursor: grab;
+      transition: transform 0.12s ease, box-shadow 0.12s ease, background-color 0.12s ease;
+    }
+
+    input[type="range"].crisis-slider:active::-webkit-slider-thumb {
+      cursor: grabbing;
+      transform: scale(1.16);
+      background: #fbbf24;
+      box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.35), 0 4px 12px rgba(0, 0, 0, 0.8);
+    }
+
+    input[type="range"].crisis-slider::-moz-range-thumb {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #f8fafc;
+      border: 3px solid #0f172a;
+      box-shadow: 0 0 0 2px rgba(248, 250, 252, 0.4), 0 4px 10px rgba(0, 0, 0, 0.6);
+      cursor: grab;
+      transition: transform 0.12s ease, box-shadow 0.12s ease;
+    }
+
+    @keyframes scanline {
+      0% { transform: translateY(-100%); }
+      100% { transform: translateY(1000%); }
+    }
+
+    .scanline-overlay {
+      pointer-events: none;
+      background: linear-gradient(
+        to bottom,
+        transparent 0%,
+        rgba(255, 255, 255, 0.02) 50%,
+        transparent 100%
+      );
+      height: 80px;
+      width: 100%;
+      position: fixed;
+      top: 0;
+      left: 0;
+      animation: scanline 9s linear infinite;
+      z-index: 50;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 antialiased selection:bg-amber-500/30 selection:text-amber-200 overflow-x-hidden">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useCallback } = React;
+
+    // --- LUCIDE SVG ICONS ---
+    const Icon = ({ name, className = "w-5 h-5" }) => {
+      const icons = {
+        Scale: (
+          <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/>
+          </svg>
+        ),
+        Clock: (
+          <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+          </svg>
+        ),
+        Flame: (
+          <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>
+          </svg>
+        ),
+        TrendingUp: (
+          <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>
+          </svg>
+        ),
+        TrendingDown: (
+          <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/><polyline points="16 17 22 17 22 11"/>
+          </svg>
+        ),
+        Crown: (
+          <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/><path d="M5 21h14"/>
+          </svg>
+        ),
+        Zap: (
+          <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/>
+          </svg>
+        ),
+        HardHat: (
+          <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M2 18a1 1 0 0 0 1 1h18a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v2z"/><path d="M10 10V5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v5"/><path d="M4 15v-3a6 6 0 0 1 6-6"/><path d="M14 6a6 6 0 0 1 6 6v3"/>
+          </svg>
+        ),
+        Building2: (
+          <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/>
+          </svg>
+        ),
+        Users: (
+          <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+        ),
+        HeartHandshake: (
+          <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/><path d="M12 5 9.04 7.96a2.17 2.17 0 0 0 0 3.08c.82.82 2.13.85 3 .07l2.07-1.9a2.82 2.82 0 0 1 3.79 0l2.96 2.66"/><path d="m18 15-2-2"/><path d="m15 18-2-2"/>
+          </svg>
+        ),
+        HeartPulse: (
+          <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/><path d="M3.22 12H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27"/>
+          </svg>
+        ),
+        Landmark: (
+          <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/>
+          </svg>
+        ),
+        ShoppingCart: (
+          <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/>
+          </svg>
+        ),
+        Wheat: (
+          <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M2 22 16 8"/><path d="M3.47 12.53 5 11l1.53 1.53a3.5 3.5 0 0 1 0 4.94L5 19l-1.53-1.53a3.5 3.5 0 0 1 0-4.94Z"/><path d="M7.47 8.53 9 7l1.53 1.53a3.5 3.5 0 0 1 0 4.94L9 15l-1.53-1.53a3.5 3.5 0 0 1 0-4.94Z"/><path d="M11.47 4.53 13 3l1.53 1.53a3.5 3.5 0 0 1 0 4.94L13 11l-1.53-1.53a3.5 3.5 0 0 1 0-4.94Z"/><path d="M20 2h2v2a4 4 0 0 1-4 4h-2V6a4 4 0 0 1 4-4Z"/><path d="M11.47 17.47 13 19l-1.53 1.53a3.5 3.5 0 0 1-4.94 0L5 19l1.53-1.53a3.5 3.5 0 0 1 4.94 0Z"/><path d="M15.47 13.47 17 15l-1.53 1.53a3.5 3.5 0 0 1-4.94 0L9 15l1.53-1.53a3.5 3.5 0 0 1 4.94 0Z"/><path d="M19.47 9.47 21 11l-1.53 1.53a3.5 3.5 0 0 1-4.94 0L13 11l1.53-1.53a3.5 3.5 0 0 1 4.94 0Z"/>
+          </svg>
+        ),
+        Briefcase: (
+          <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect width="20" height="14" x="2" y="7" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+          </svg>
+        ),
+        Receipt: (
+          <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 17.5v-11"/>
+          </svg>
+        ),
+        ShieldCheck: (
+          <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/>
+          </svg>
+        ),
+        Lock: (
+          <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+        ),
+        Skull: (
+          <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><path d="M8 20v2h8v-2"/><path d="m12.5 17-.5-1-.5 1h1z"/><path d="M16 20a2 2 0 0 0 1.56-3.25 8 8 0 1 0-11.12 0A2 2 0 0 0 8 20"/>
+          </svg>
+        ),
+        RotateCcw: (
+          <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>
+          </svg>
+        ),
+        Volume2: (
+          <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+          </svg>
+        ),
+        VolumeX: (
+          <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="22" x2="16" y1="9" y2="15"/><line x1="16" x2="22" y1="9" y2="15"/>
+          </svg>
+        ),
+        CheckCircle2: (
+          <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>
+          </svg>
+        ),
+        Radio: (
+          <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/>
+          </svg>
+        ),
+        Minus: (
+          <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M5 12h14"/>
+          </svg>
+        ),
+        Plus: (
+          <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M5 12h14"/><path d="M12 5v14"/>
+          </svg>
+        ),
+        AlertOctagon: (
+          <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/>
+          </svg>
+        ),
+        CloudOff: (
+          <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="m2 2 20 20"/><path d="M5.782 5.782A7 7 0 0 0 9 19h8.5a4.5 4.5 0 0 0 1.307-.193"/><path d="M21.532 16.5A4.5 4.5 0 0 0 17.5 10h-1.79A7.008 7.008 0 0 0 10 5.07"/>
+          </svg>
+        ),
+        Siren: (
+          <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M7 18v-6a5 5 0 1 1 10 0v6"/><path d="M5 21a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-1a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2z"/><path d="M21 12h1"/><path d="M18.5 4.5 18 5"/><path d="M2 12h1"/><path d="M12 2v1"/><path d="m4.929 4.929.707.707"/><path d="M12 12v6"/>
+          </svg>
+        ),
+        ArrowRight: (
+          <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>
+          </svg>
+        ),
+        Trophy: (
+          <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/>
+          </svg>
+        ),
+        Award: (
+          <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/>
+          </svg>
+        ),
+        Share2: (
+          <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" x2="15.42" y1="13.51" y2="17.49"/><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"/>
+          </svg>
+        ),
+        Check: (
+          <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20 6 9 17l-5-5"/>
+          </svg>
+        ),
+        Play: (
+          <svg className={className} viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polygon points="6 3 20 12 6 21 6 3"/>
+          </svg>
+        ),
+        AlertTriangle: (
+          <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>
+          </svg>
+        ),
+        Layers: (
+          <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/>
+          </svg>
+        ),
+        Scissors: (
+          <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="6" cy="6" r="3"/><path d="M8.12 8.12 12 12"/><path d="M20 4 8.12 15.88"/><circle cx="6" cy="18" r="3"/><path d="M14.8 14.8 20 20"/>
+          </svg>
+        ),
+        Sparkles: (
+          <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
+          </svg>
+        ),
+      };
+      return icons[name] || icons.Landmark;
+    };
+
+    // --- WEB AUDIO SYNTHESIZED EFFECTS ---
+    class SoundEffects {
+      constructor() {
+        this.ctx = null;
+        this.muted = false;
+      }
+      init() {
+        if (!this.ctx && typeof window !== 'undefined') {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (AudioContext) this.ctx = new AudioContext();
+        }
+        if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+      }
+      setMuted(m) { this.muted = m; }
+      playTick(freq = 520, duration = 0.025, vol = 0.04) {
+        if (this.muted) return;
+        try {
+          this.init();
+          if (!this.ctx) return;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+          gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start();
+          osc.stop(this.ctx.currentTime + duration);
+        } catch {}
+      }
+      playShockAlert() {
+        if (this.muted) return;
+        try {
+          this.init();
+          if (!this.ctx) return;
+          const now = this.ctx.currentTime;
+          [0, 0.18, 0.36].forEach((offset, idx) => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(idx % 2 === 0 ? 660 : 880, now + offset);
+            gain.gain.setValueAtTime(0.09, now + offset);
+            gain.gain.exponentialRampToValueAtTime(0.005, now + offset + 0.15);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now + offset);
+            osc.stop(now + offset + 0.15);
+          });
+        } catch {}
+      }
+      playDefaultSiren() {
+        if (this.muted) return;
+        try {
+          this.init();
+          if (!this.ctx) return;
+          const now = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(420, now);
+          osc.frequency.linearRampToValueAtTime(140, now + 0.55);
+          gain.gain.setValueAtTime(0.14, now);
+          gain.gain.exponentialRampToValueAtTime(0.005, now + 0.55);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.55);
+        } catch {}
+      }
+      playVictory() {
+        if (this.muted) return;
+        try {
+          this.init();
+          if (!this.ctx) return;
+          const now = this.ctx.currentTime;
+          [523.25, 659.25, 783.99, 1046.5].forEach((freq, i) => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, now + i * 0.11);
+            gain.gain.setValueAtTime(0.11, now + i * 0.11);
+            gain.gain.exponentialRampToValueAtTime(0.005, now + i * 0.11 + 0.3);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now + i * 0.11);
+            osc.stop(now + i * 0.11 + 0.3);
+          });
+        } catch {}
+      }
+      playDefeat() {
+        if (this.muted) return;
+        try {
+          this.init();
+          if (!this.ctx) return;
+          const now = this.ctx.currentTime;
+          [349.23, 311.13, 277.18, 207.65].forEach((freq, i) => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(freq, now + i * 0.16);
+            gain.gain.setValueAtTime(0.09, now + i * 0.16);
+            gain.gain.exponentialRampToValueAtTime(0.005, now + i * 0.16 + 0.28);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now + i * 0.16);
+            osc.stop(now + i * 0.16 + 0.28);
+          });
+        } catch {}
+      }
+    }
+    const soundFX = new SoundEffects();
+
+    // --- DATA & MATHEMATICAL ENGINE ---
+    const INITIAL_STATE = {
+      timerSeconds: 180,
+      basePazSocial: 65,
+      baseActividad: 60,
+      initialFiscalResult: -4.0,
+      initialTotalSpending: 20.5,
+      initialTotalRevenue: 16.5,
+      structuralSpendingOffset: 1.0,
+      lafferFactor: 0.75,
+    };
+
+    const SPENDING_BLOCKS = [
+      {
+        id: 'politica',
+        name: 'Cargos Políticos, Choferes y Legislativo',
+        category: 'spending',
+        icon: 'Crown',
+        initial: 0.15,
+        min: 0.02,
+        max: 0.30,
+        step: 0.01,
+        locked: false,
+        ruleSummary: 'Recortarlo al mínimo suma +10 de Paz Social, pero apenas mueve la aguja fiscal.',
+        computeImpact: (val) => {
+          const delta = val - 0.15;
+          const pazDelta = delta < 0 ? (Math.abs(delta) / 0.13) * 10 : -(delta / 0.15) * 12;
+          return { pazSocial: pazDelta, actividad: 0 };
+        },
+        newsOnCut: 'Euforia en redes por recorte de choferes y viáticos en el Congreso, aunque el ahorro fiscal es simbólico.',
+        newsOnRaise: 'Indignación ciudadana por aumento del presupuesto para cargos políticos y asesores.',
+      },
+      {
+        id: 'subsidios',
+        name: 'Subsidios a Luz, Gas y Transporte',
+        category: 'spending',
+        icon: 'Zap',
+        initial: 2.20,
+        min: 0.00,
+        max: 3.50,
+        step: 0.05,
+        locked: false,
+        ruleSummary: 'Cada 0.50% de recorte: -8 Paz Social y -3 Actividad (caída del ingreso disponible).',
+        computeImpact: (val) => {
+          const diff = 2.20 - val;
+          return { pazSocial: -(diff / 0.50) * 8, actividad: -(diff / 0.50) * 3 };
+        },
+        newsOnCut: 'Tarifazo en boletas de luz, gas y boleto de colectivo: cacerolazos y menor consumo en comercios.',
+        newsOnRaise: 'Congelamiento tarifario alivia el bolsillo pero dispara el costo energético del Tesoro.',
+      },
+      {
+        id: 'obra_publica',
+        name: 'Obra Pública y Giro a Provincias',
+        category: 'spending',
+        icon: 'HardHat',
+        initial: 2.20,
+        min: 0.10,
+        max: 3.50,
+        step: 0.05,
+        locked: false,
+        ruleSummary: 'Cada 0.50% de recorte: -7 Actividad Económica y -5 Paz Social (conflicto con gobernadores).',
+        computeImpact: (val) => {
+          const diff = 2.20 - val;
+          return { pazSocial: -(diff / 0.50) * 5, actividad: -(diff / 0.50) * 7 };
+        },
+        newsOnCut: 'Rebelión de gobernadores y freno en la construcción por parálisis de obra pública y transferencias.',
+        newsOnRaise: 'Gobernadores celebran reactivación de obras viales y giros discrecionales.',
+      },
+      {
+        id: 'empresas',
+        name: 'Empresas Públicas y Otros Gastos',
+        category: 'spending',
+        icon: 'Building2',
+        initial: 2.40,
+        min: 0.50,
+        max: 3.50,
+        step: 0.05,
+        locked: false,
+        ruleSummary: 'Cada 0.50% de recorte: -6 Paz Social (paros de transporte y servicios públicos).',
+        computeImpact: (val) => {
+          const diff = 2.40 - val;
+          return { pazSocial: -(diff / 0.50) * 6, actividad: -(diff / 0.50) * 1.5 };
+        },
+        newsOnCut: 'Gremios ferroviarios y aeronáuticos lanzan paros sorpresivos por recorte en empresas estatales.',
+        newsOnRaise: 'Mayores transferencias operativas a empresas estatales contienen conflictos gremiales.',
+      },
+      {
+        id: 'salarios',
+        name: 'Salarios Públicos y Funcionamiento',
+        category: 'spending',
+        icon: 'Users',
+        initial: 2.45,
+        min: 1.50,
+        max: 3.50,
+        step: 0.05,
+        locked: false,
+        ruleSummary: 'Cada 0.25% de recorte: -8 Paz Social (huelgas en administración, salud, universidades y seguridad).',
+        computeImpact: (val) => {
+          const diff = 2.45 - val;
+          return { pazSocial: -(diff / 0.25) * 8, actividad: -(diff / 0.25) * 1.5 };
+        },
+        newsOnCut: 'Paro en dependencias públicas, hospitales y universidades por licuación salarial en el Estado.',
+        newsOnRaise: 'Paritarias estatales por encima de la inflación descomprimen la protesta gremial.',
+      },
+      {
+        id: 'sociales',
+        name: 'Programas Sociales y Asignaciones',
+        category: 'spending',
+        icon: 'HeartHandshake',
+        initial: 2.30,
+        min: 1.00,
+        max: 3.50,
+        step: 0.05,
+        locked: false,
+        ruleSummary: 'Cada 0.25% de recorte: -12 Paz Social (impacto crítico en la calle y piquetes).',
+        computeImpact: (val) => {
+          const diff = 2.30 - val;
+          return { pazSocial: -(diff / 0.25) * 12, actividad: -(diff / 0.25) * 2 };
+        },
+        newsOnCut: 'Alerta máxima en accesos y Puente Pueyrredón: movimientos sociales cortan rutas por recorte de programas.',
+        newsOnRaise: 'Refuerzo en AUH y Tarjeta Alimentar calma la tensión social en el conurbano.',
+      },
+      {
+        id: 'jubilaciones',
+        name: 'Jubilaciones y Pensiones',
+        category: 'spending',
+        icon: 'HeartPulse',
+        initial: 6.20,
+        min: 4.50,
+        max: 7.50,
+        step: 0.05,
+        locked: false,
+        badge: 'BLOQUE MÁS GRANDE',
+        ruleSummary: 'El mayor peso del gasto. Cada 0.25% de recorte: -10 Paz Social y -4 Actividad Económica.',
+        computeImpact: (val) => {
+          const diff = 6.20 - val;
+          return { pazSocial: -(diff / 0.25) * 10, actividad: -(diff / 0.25) * 4 };
+        },
+        newsOnCut: 'Fuerte caída real de haberes jubilatorios: marchas frente al Congreso y desplome del consumo en farmacias y súper.',
+        newsOnRaise: 'Bono y recomposición previsional sostienen el consumo pero presionan la caja de ANSES.',
+      },
+      {
+        id: 'deuda',
+        name: 'Intereses de Deuda Soberana',
+        category: 'spending',
+        icon: 'Landmark',
+        initial: 1.60,
+        min: 0.00,
+        max: 1.60,
+        step: 1.60,
+        locked: true,
+        hasDefaultButton: true,
+        ruleSummary: 'Fijo en 1.60% PBI. Declarar Default lleva el gasto a 0.00%, pero hunde -35 Actividad y -20 Paz Social.',
+        computeImpact: (val, isDefaulted) => {
+          if (isDefaulted) return { pazSocial: -20, actividad: -35 };
+          return { pazSocial: 0, actividad: 0 };
+        },
+        newsOnCut: '¡DEFAULT SOBERANO! Se desploman los bonos, se dispara el Riesgo País a 4.500 puntos y se corta el crédito.',
+      },
+    ];
+
+    const REVENUE_BLOCKS = [
+      {
+        id: 'iva',
+        name: 'IVA (Impuesto al Consumo)',
+        category: 'revenue',
+        icon: 'ShoppingCart',
+        initial: 5.20,
+        min: 3.50,
+        max: 6.50,
+        step: 0.05,
+        locked: false,
+        ruleSummary: 'Cada +0.50% de suba: -10 Paz Social y -8 Actividad. (Efecto Laffer: recauda 75% neto).',
+        computeImpact: (val) => {
+          const diff = val - 5.20;
+          if (diff >= 0) return { pazSocial: -(diff / 0.50) * 10, actividad: -(diff / 0.50) * 8 };
+          const cut = Math.abs(diff);
+          return { pazSocial: (cut / 0.50) * 7, actividad: (cut / 0.50) * 6 };
+        },
+        newsOnRaise: 'Suba del IVA impacta de lleno en la canasta básica: se derrumba el consumo masivo.',
+        newsOnCut: 'Rebaja del IVA en alimentos impulsa las ventas minoristas pero resigna recaudación inmediata.',
+      },
+      {
+        id: 'retenciones',
+        name: 'Retenciones (Exportaciones)',
+        category: 'revenue',
+        icon: 'Wheat',
+        initial: 1.30,
+        min: 0.00,
+        max: 2.50,
+        step: 0.05,
+        locked: false,
+        ruleSummary: 'Subir (+0.50%): -12 Actividad y -6 Paz Social (paro agro). Bajar (-0.50%): +8 Actividad.',
+        computeImpact: (val) => {
+          const diff = val - 1.30;
+          if (diff >= 0) return { pazSocial: -(diff / 0.50) * 6, actividad: -(diff / 0.50) * 12 };
+          const cut = Math.abs(diff);
+          return { pazSocial: (cut / 0.50) * 2, actividad: (cut / 0.50) * 8 };
+        },
+        newsOnRaise: 'Tractorazo y cese de comercialización de granos en rutas por suba de Retenciones al agro.',
+        newsOnCut: 'Baja de Retenciones acelera liquidación de divisas y venta de maquinaria agrícola.',
+      },
+      {
+        id: 'ganancias',
+        name: 'Impuesto a las Ganancias y Renta',
+        category: 'revenue',
+        icon: 'Briefcase',
+        initial: 2.50,
+        min: 1.50,
+        max: 4.00,
+        step: 0.05,
+        locked: false,
+        ruleSummary: 'Cada +0.50% de suba: -7 Paz Social y -5 Actividad Económica.',
+        computeImpact: (val) => {
+          const diff = val - 2.50;
+          if (diff >= 0) return { pazSocial: -(diff / 0.50) * 7, actividad: -(diff / 0.50) * 5 };
+          const cut = Math.abs(diff);
+          return { pazSocial: (cut / 0.50) * 5, actividad: (cut / 0.50) * 4 };
+        },
+        newsOnRaise: 'Sindicatos industriales y bancarios en pie de guerra por reversión del Impuesto a las Ganancias.',
+        newsOnCut: 'Alivio en el mínimo no imponible de Ganancias sostiene el poder adquisitivo de la clase media.',
+      },
+      {
+        id: 'cheque',
+        name: 'Impuesto al Cheque y Otros Tributos',
+        category: 'revenue',
+        icon: 'Receipt',
+        initial: 3.40,
+        min: 1.50,
+        max: 4.50,
+        step: 0.05,
+        locked: false,
+        ruleSummary: 'Cada +0.50% de suba: -9 Actividad Económica (asfixia financiera a PyMEs y formalidad).',
+        computeImpact: (val) => {
+          const diff = val - 3.40;
+          if (diff >= 0) return { pazSocial: -(diff / 0.50) * 2, actividad: -(diff / 0.50) * 9 };
+          const cut = Math.abs(diff);
+          return { pazSocial: (cut / 0.50) * 1, actividad: (cut / 0.50) * 6 };
+        },
+        newsOnRaise: 'Cámaras PyME advierten por cierre de comercios e informalidad tras suba de impuestos distorsivos.',
+        newsOnCut: 'Reducción del Impuesto al Cheque abarata el crédito comercial y oxigena a las PyMEs.',
+      },
+      {
+        id: 'aportes',
+        name: 'Aportes Seguridad Social (Fijo)',
+        category: 'revenue',
+        icon: 'ShieldCheck',
+        initial: 4.10,
+        min: 4.10,
+        max: 4.10,
+        step: 0.10,
+        locked: true,
+        ruleSummary: 'Fijo en 4.10% del PBI. Recursos afectados directamente al sistema previsional.',
+        computeImpact: () => ({ pazSocial: 0, actividad: 0 }),
+      },
+    ];
+
+    const SHOCKS_AT_120 = [
+      {
+        id: 'sequia_historica',
+        badge: 'ALERTA CLIMÁTICA Y EXTERNA · MINUTO 02:00',
+        title: 'Sequía Histórica en la Zona Núcleo',
+        description: 'Una ola de calor extrema destruye el 40% de la cosecha de soja y maíz. Se desploman las exportaciones del complejo agroindustrial y caen los ingresos fiscales por Retenciones.',
+        icon: 'CloudOff',
+        choices: [
+          {
+            id: 'absorber_sequia',
+            label: 'Absorber el Golpe Fiscal',
+            subtitle: 'Pierdes 0.60% del PBI en ingresos por Retenciones y -5 de Actividad.',
+            effects: {
+              fiscalDelta: -0.60,
+              pazDelta: 0,
+              actividadDelta: -5,
+              sliderAdjust: null,
+              news: 'URGENTE: La sequía histórica perfora la recaudación de derechos de exportación (-0.60% PBI).',
+            },
+          },
+          {
+            id: 'dolar_soja_emergencia',
+            label: 'Lanzar "Dólar Agro" de Emergencia',
+            subtitle: 'Atenúa la pérdida fiscal a -0.25% PBI, pero la inflación del salto cambiario resta -10 de Paz Social.',
+            effects: {
+              fiscalDelta: -0.25,
+              pazDelta: -10,
+              actividadDelta: -2,
+              sliderAdjust: null,
+              news: 'URGENTE: El Gobierno lanza un tipo de cambio diferencial para el agro; se recalienta el precio de los alimentos.',
+            },
+          },
+        ],
+      },
+      {
+        id: 'fallo_judicial_jubilaciones',
+        badge: 'REVÉS JUDICIAL · MINUTO 02:00',
+        title: 'Fallo de la Corte Suprema por Haberes Jubilatorios',
+        description: 'La Corte Suprema declara inconstitucional el rezago de la fórmula previsional y ordena recomponer de inmediato los haberes jubilatorios en todo el país.',
+        icon: 'Scale',
+        choices: [
+          {
+            id: 'acatar_fallo',
+            label: 'Acatar el Fallo y Recomponer Haberes',
+            subtitle: 'Debes sumar +0.40% del PBI al gasto de Jubilaciones (+4 Paz Social).',
+            effects: {
+              fiscalDelta: 0,
+              pazDelta: 4,
+              actividadDelta: 2,
+              sliderAdjust: { blockId: 'jubilaciones', delta: 0.40 },
+              news: 'URGENTE: Economía acata el fallo de la Corte y suma 0.40% del PBI en gasto previsional.',
+            },
+          },
+          {
+            id: 'desoir_vetar',
+            label: 'Postergar Pago por Decreto de Emergencia',
+            subtitle: 'Mantienes la caja intacta, pero pierdes -15 puntos de Paz Social de inmediato.',
+            effects: {
+              fiscalDelta: 0,
+              pazDelta: -15,
+              actividadDelta: -2,
+              sliderAdjust: null,
+              news: 'URGENTE: El Ejecutivo posterga el fallo jubilatorio; cacerolazos y protestas masivas frente a Tribunales.',
+            },
+          },
+        ],
+      },
+    ];
+
+    const SHOCKS_AT_60 = [
+      {
+        id: 'corrida_cambiaria_fmi',
+        badge: 'CRISIS CAMBIARIA · MINUTO 01:00',
+        title: 'Corrida Cambiaria y Ultimátum del FMI',
+        description: 'Se dispara el dólar financiero un 22% en dos ruedas. El FMI exige acelerar el ajuste con un apretón monetario inmediato o se desata una espiral cambiaria.',
+        icon: 'TrendingDown',
+        choices: [
+          {
+            id: 'apreton_fmi',
+            label: 'Aplicar Súper-Tasa y Apretón Monetario',
+            subtitle: 'Secas la plaza de pesos: suma +0.25% de alivio fiscal, pero cae -14 puntos la Actividad Económica.',
+            effects: {
+              fiscalDelta: 0.25,
+              pazDelta: -4,
+              actividadDelta: -14,
+              sliderAdjust: null,
+              news: 'URGENTE: Fuerte suba de tasas frena la corrida cambiaria pero congela el crédito productivo.',
+            },
+          },
+          {
+            id: 'devaluar_intervenir',
+            label: 'Convalidar Salto Cambiario y Licuar',
+            subtitle: 'Cae -12 puntos la Paz Social y -8 la Actividad por traslado directo a precios.',
+            effects: {
+              fiscalDelta: 0.15,
+              pazDelta: -12,
+              actividadDelta: -8,
+              sliderAdjust: null,
+              news: 'URGENTE: Salto cambiario desata remarcaciones de precios del 15% en supermercados.',
+            },
+          },
+        ],
+      },
+      {
+        id: 'paro_general_cgt',
+        badge: 'TENSIÓN SINDICAL · MINUTO 01:00',
+        title: 'Paro General por Tiempo Indeterminado',
+        description: 'Las centrales sindicales y el transporte de cargas anuncian un paro nacional con bloqueo de refinerías y puertos ante el ajuste en curso.',
+        icon: 'Siren',
+        choices: [
+          {
+            id: 'mantener_pulso',
+            label: 'Mantener el Rumbo sin Concesiones',
+            subtitle: 'El paro paraliza la calle: -12 puntos de Paz Social y -10 puntos de Actividad Económica.',
+            effects: {
+              fiscalDelta: 0,
+              pazDelta: -12,
+              actividadDelta: -10,
+              sliderAdjust: null,
+              news: 'URGENTE: País paralizado por huelga general de transporte; tensión en accesos y desabastecimiento parcial.',
+            },
+          },
+          {
+            id: 'bono_compensacion',
+            label: 'Otorgar Bono y Subsidio al Transporte',
+            subtitle: 'Desactivas el paro (+6 Paz Social), pero pierdes -0.45% del PBI en el Resultado Fiscal.',
+            effects: {
+              fiscalDelta: -0.45,
+              pazDelta: 6,
+              actividadDelta: 2,
+              sliderAdjust: null,
+              news: 'URGENTE: El Ministerio cede un bono de emergencia de 0.45% del PBI para levantar el paro general.',
+            },
+          },
+        ],
+      },
+    ];
+
+    // --- COMPONENTS ---
+    function StickyCrisisHeader({
+      timeLeft,
+      fiscalResult,
+      totalRevenueReal,
+      totalSpending,
+      pazSocial,
+      actividad,
+      latestNews,
+      muted,
+      onToggleMute,
+      onReset,
+      onConfirmVictory,
+      gameStatus,
+    }) {
+      const minutes = String(Math.floor(timeLeft / 60)).padStart(2, '0');
+      const seconds = String(timeLeft % 60).padStart(2, '0');
+      const isLowTime = timeLeft <= 30 && gameStatus === 'playing';
+      const isGoalMet = fiscalResult >= -0.001 && pazSocial > 0 && actividad > 0;
+      const fiscalProgress = Math.max(0, Math.min(100, ((fiscalResult + 4.5) / 4.5) * 100));
+
+      const getSemaphoreColor = (val) => {
+        if (val >= 50) {
+          return {
+            bar: 'bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.5)]',
+            text: 'text-emerald-400',
+            border: 'border-emerald-500/30',
+            badge: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+            status: 'ESTABLE',
+          };
+        }
+        if (val >= 25) {
+          return {
+            bar: 'bg-amber-500 shadow-[0_0_12px_rgba(245,158,11,0.5)]',
+            text: 'text-amber-400',
+            border: 'border-amber-500/40',
+            badge: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+            status: 'TENSIÓN',
+          };
+        }
+        return {
+          bar: 'bg-rose-600 animate-pulse shadow-[0_0_15px_rgba(225,29,72,0.8)]',
+          text: 'text-rose-400 animate-pulse',
+          border: 'border-rose-500/60',
+          badge: 'bg-rose-500/20 text-rose-300 border-rose-500/50 animate-pulse',
+          status: 'CRÍTICO',
+        };
+      };
+
+      const pazStyle = getSemaphoreColor(pazSocial);
+      const actStyle = getSemaphoreColor(actividad);
+
+      const fiscalColor =
+        fiscalResult >= -0.001 ? 'text-emerald-400' : fiscalResult >= -1.5 ? 'text-amber-400' : 'text-rose-400';
+      const fiscalBarColor =
+        fiscalResult >= -0.001
+          ? 'bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.6)]'
+          : fiscalResult >= -1.5
+          ? 'bg-amber-500'
+          : 'bg-rose-500';
+
+      return (
+        <header className="sticky top-0 z-40 w-full bg-slate-950/95 backdrop-blur-xl border-b border-slate-800/90 shadow-2xl">
+          <div className="max-w-5xl mx-auto px-3 sm:px-6 pt-2.5 pb-2 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5">
+              <div className="relative flex items-center justify-center w-9 h-9 rounded-lg bg-rose-500/15 border border-rose-500/40 text-rose-400">
+                <Icon name="Scale" className="w-5 h-5" />
+                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
+                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-rose-500" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-sm sm:text-base font-black tracking-tight uppercase text-slate-100">
+                    Ministro <span className="text-amber-400">x 3 Minutos</span>
+                  </h1>
+                  <span className="hidden md:inline-flex items-center px-2 py-0.5 text-[10px] font-mono font-bold uppercase tracking-wider bg-slate-800 text-slate-300 rounded border border-slate-700">
+                    TABLERO DE CRISIS · OPC
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 hidden sm:block">
+                  Misión: Llevar el déficit de -4.00% PBI a 0.00% sin colapsar la calle ni la actividad
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {isGoalMet && gameStatus === 'playing' && (
+                <button
+                  onClick={onConfirmVictory}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs sm:text-sm shadow-[0_0_20px_rgba(16,185,129,0.6)] animate-bounce transition-all cursor-pointer"
+                >
+                  <Icon name="CheckCircle2" className="w-4 h-4" />
+                  <span>¡FIRMAR DECRETO!</span>
+                </button>
+              )}
+
+              <div
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border font-mono font-bold text-base sm:text-lg tabular-nums transition-colors ${
+                  isLowTime
+                    ? 'bg-rose-950/90 border-rose-500 text-rose-300 animate-pulse shadow-[0_0_15px_rgba(225,29,72,0.5)]'
+                    : 'bg-slate-900 border-slate-700/80 text-amber-400'
+                }`}
+              >
+                <Icon name="Clock" className="w-4 h-4" />
+                <span>{minutes}:{seconds}</span>
+              </div>
+
+              <button
+                onClick={onToggleMute}
+                title={muted ? 'Activar sonido' : 'Silenciar'}
+                className="p-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition-colors"
+              >
+                <Icon name={muted ? 'VolumeX' : 'Volume2'} className="w-4 h-4 text-amber-400" />
+              </button>
+
+              <button
+                onClick={onReset}
+                title="Reiniciar partida"
+                className="p-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition-colors"
+              >
+                <Icon name="RotateCcw" className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          <div className="max-w-5xl mx-auto px-3 sm:px-6 pb-2.5 grid grid-cols-3 gap-2 sm:gap-3">
+            <div
+              className={`rounded-xl p-2 sm:p-3 bg-slate-900/90 border transition-all ${
+                isGoalMet ? 'border-emerald-500/60 shadow-[0_0_15px_rgba(16,185,129,0.15)]' : 'border-slate-800'
+              }`}
+            >
+              <div className="flex items-center justify-between gap-1 mb-1">
+                <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400 truncate">
+                  1. Resultado Fiscal
+                </span>
+                <span
+                  className={`hidden sm:inline-block text-[10px] font-mono px-1.5 py-0.5 rounded border ${
+                    isGoalMet
+                      ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                      : 'bg-rose-500/15 text-rose-300 border-rose-500/30'
+                  }`}
+                >
+                  {fiscalResult >= -0.001 ? 'META LOGRADA' : 'META: 0.00%'}
+                </span>
+              </div>
+              <div className="flex items-baseline justify-between gap-1">
+                <span className={`font-mono text-lg sm:text-2xl font-black tabular-nums ${fiscalColor}`}>
+                  {fiscalResult > 0 ? `+${fiscalResult.toFixed(2)}` : fiscalResult.toFixed(2)}%
+                </span>
+                <span className="text-[10px] font-mono text-slate-400 hidden md:inline">
+                  Ing {totalRevenueReal.toFixed(2)}% · Gas {totalSpending.toFixed(2)}%
+                </span>
+              </div>
+              <div className="mt-1.5 w-full h-2 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
+                <div
+                  className={`h-full transition-all duration-300 rounded-full ${fiscalBarColor}`}
+                  style={{ width: `${fiscalProgress}%` }}
+                />
+              </div>
+            </div>
+
+            <div className={`rounded-xl p-2 sm:p-3 bg-slate-900/90 border transition-all ${pazStyle.border}`}>
+              <div className="flex items-center justify-between gap-1 mb-1">
+                <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1 truncate">
+                  <Icon name="Flame" className="w-3.5 h-3.5 text-amber-400 shrink-0 hidden sm:inline" />
+                  <span>2. Paz Social</span>
+                </span>
+                <span className={`hidden sm:inline-block text-[10px] font-mono px-1.5 py-0.5 rounded border ${pazStyle.badge}`}>
+                  {pazStyle.status}
+                </span>
+              </div>
+              <div className="flex items-baseline justify-between">
+                <span className={`font-mono text-lg sm:text-2xl font-black tabular-nums ${pazStyle.text}`}>
+                  {Math.round(pazSocial)}%
+                </span>
+                <span className="text-[10px] font-mono text-slate-500 hidden sm:inline">
+                  {pazSocial < 25 ? '¡CAOS EN CALLE!' : 'Base 65%'}
+                </span>
+              </div>
+              <div className="mt-1.5 w-full h-2 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
+                <div
+                  className={`h-full transition-all duration-300 rounded-full ${pazStyle.bar}`}
+                  style={{ width: `${Math.max(0, Math.min(100, pazSocial))}%` }}
+                />
+              </div>
+            </div>
+
+            <div className={`rounded-xl p-2 sm:p-3 bg-slate-900/90 border transition-all ${actStyle.border}`}>
+              <div className="flex items-center justify-between gap-1 mb-1">
+                <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1 truncate">
+                  <Icon name="TrendingUp" className="w-3.5 h-3.5 text-sky-400 shrink-0 hidden sm:inline" />
+                  <span>3. Actividad</span>
+                </span>
+                <span className={`hidden sm:inline-block text-[10px] font-mono px-1.5 py-0.5 rounded border ${actStyle.badge}`}>
+                  {actStyle.status}
+                </span>
+              </div>
+              <div className="flex items-baseline justify-between">
+                <span className={`font-mono text-lg sm:text-2xl font-black tabular-nums ${actStyle.text}`}>
+                  {Math.round(actividad)}%
+                </span>
+                <span className="text-[10px] font-mono text-slate-500 hidden sm:inline">
+                  {actividad < 25 ? '¡DEPRESIÓN!' : 'Base 60%'}
+                </span>
+              </div>
+              <div className="mt-1.5 w-full h-2 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
+                <div
+                  className={`h-full transition-all duration-300 rounded-full ${actStyle.bar}`}
+                  style={{ width: `${Math.max(0, Math.min(100, actividad))}%` }}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-slate-900/90 border-t border-slate-800/80 px-3 sm:px-6 py-1.5">
+            <div className="max-w-5xl mx-auto flex items-center gap-2 text-xs">
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono text-[10px] font-bold uppercase shrink-0">
+                <Icon name="Radio" className="w-3 h-3 animate-pulse text-amber-400" />
+                CABLE EN VIVO
+              </span>
+              <p className="text-slate-300 font-medium truncate text-[11px] sm:text-xs">
+                {latestNews}
+              </p>
+            </div>
+          </div>
+        </header>
+      );
+    }
+
+    function BudgetSliderCard({ block, value, isDefaulted, onChange, onDeclareDefault, disabled }) {
+      const isSpending = block.category === 'spending';
+      const nominalDelta = value - block.initial;
+      const isModified = Math.abs(nominalDelta) > 0.004 || (block.hasDefaultButton && isDefaulted);
+
+      let fiscalEffect = 0;
+      if (isSpending) {
+        fiscalEffect = -nominalDelta;
+      } else {
+        fiscalEffect = nominalDelta >= 0 ? nominalDelta * INITIAL_STATE.lafferFactor : nominalDelta;
+      }
+
+      const impact = block.computeImpact(value, isDefaulted);
+      const pazImpact = Math.round(impact.pazSocial * 10) / 10;
+      const actImpact = Math.round(impact.actividad * 10) / 10;
+
+      const percent = block.max > block.min
+        ? Math.max(0, Math.min(100, ((value - block.min) / (block.max - block.min)) * 100))
+        : 100;
+      const initialPercent = block.max > block.min
+        ? Math.max(0, Math.min(100, ((block.initial - block.min) / (block.max - block.min)) * 100))
+        : 100;
+
+      const trackColor = isSpending ? '#f43f5e' : '#38bdf8';
+
+      const handleStep = (dir) => {
+        if (disabled || block.locked) return;
+        const next = Math.max(block.min, Math.min(block.max, Number((value + dir * block.step).toFixed(2))));
+        onChange(block.id, next);
+      };
+
+      return (
+        <div
+          className={`relative rounded-xl p-3.5 sm:p-4 transition-all border ${
+            isModified
+              ? isSpending
+                ? 'bg-slate-900/95 border-amber-500/40 shadow-[0_0_20px_rgba(245,158,11,0.06)]'
+                : 'bg-slate-900/95 border-sky-500/40 shadow-[0_0_20px_rgba(56,189,248,0.06)]'
+              : 'bg-slate-900/70 border-slate-800/90 hover:border-slate-700'
+          }`}
+        >
+          <div className="flex items-start justify-between gap-2 mb-2">
+            <div className="flex items-start gap-2.5 min-w-0">
+              <div
+                className={`p-2 rounded-lg shrink-0 mt-0.5 border ${
+                  isSpending
+                    ? 'bg-rose-500/10 border-rose-500/25 text-rose-400'
+                    : 'bg-sky-500/10 border-sky-500/25 text-sky-400'
+                }`}
+              >
+                <Icon name={block.icon} className="w-4 h-4 sm:w-5 sm:h-5" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <h3 className="text-sm sm:text-base font-bold text-slate-100 leading-tight">
+                    {block.name}
+                  </h3>
+                  {block.badge && (
+                    <span className="px-1.5 py-0.5 text-[10px] font-mono font-extrabold uppercase bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded">
+                      {block.badge}
+                    </span>
+                  )}
+                  {block.locked && !block.hasDefaultButton && (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-mono font-bold uppercase bg-slate-800 text-slate-400 border border-slate-700 rounded">
+                      <Icon name="Lock" className="w-3 h-3" /> FIJO
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5 leading-snug">
+                  {block.ruleSummary}
+                </p>
+              </div>
+            </div>
+
+            <div className="text-right shrink-0">
+              <div className="font-mono text-base sm:text-xl font-black text-slate-100 tabular-nums">
+                {value.toFixed(2)}%
+                <span className="text-[10px] font-normal text-slate-400 ml-1">PBI</span>
+              </div>
+              <div className="text-[10px] font-mono text-slate-500">
+                Base: {block.initial.toFixed(2)}%
+              </div>
+            </div>
+          </div>
+
+          {block.hasDefaultButton ? (
+            <div className="mt-3 pt-2.5 border-t border-slate-800/80 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+              <div className="flex items-center gap-2 text-xs text-slate-300">
+                <Icon name="Lock" className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>
+                  {isDefaulted
+                    ? '¡DEFAULT DECLARADO! Ahorraste 1.60% PBI pero destruiste el crédito y la calle.'
+                    : 'Compromiso rígido. Solo puedes eliminarlo entrando en cesación de pagos.'}
+                </span>
+              </div>
+
+              {!isDefaulted ? (
+                <button
+                  type="button"
+                  disabled={disabled}
+                  onClick={onDeclareDefault}
+                  className="flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/50 font-mono font-bold text-xs uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(225,29,72,0.25)] hover:shadow-[0_0_20px_rgba(225,29,72,0.7)] shrink-0 cursor-pointer"
+                >
+                  <Icon name="Skull" className="w-4 h-4" />
+                  <span>Declarar Default (0.00% PBI)</span>
+                </button>
+              ) : (
+                <span className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-950 border border-rose-500 text-rose-300 font-mono font-bold text-xs uppercase">
+                  <Icon name="Skull" className="w-4 h-4 text-rose-400 animate-bounce" />
+                  EN DEFAULT (-35 ACT / -20 PAZ)
+                </span>
+              )}
+            </div>
+          ) : !block.locked ? (
+            <div className="mt-3">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={disabled || value <= block.min}
+                  onClick={() => handleStep(-1)}
+                  className="w-8 h-8 rounded-lg bg-slate-800/90 hover:bg-slate-700 disabled:opacity-30 flex items-center justify-center text-slate-200 border border-slate-700 transition-colors shrink-0"
+                >
+                  <Icon name="Minus" className="w-3.5 h-3.5" />
+                </button>
+
+                <div className="relative flex-1 flex items-center py-2">
+                  <div
+                    className="absolute top-0.5 bottom-0.5 w-0.5 bg-slate-400/70 z-10 pointer-events-none"
+                    style={{ left: `${initialPercent}%` }}
+                  />
+                  <input
+                    type="range"
+                    min={block.min}
+                    max={block.max}
+                    step={block.step}
+                    value={value}
+                    disabled={disabled}
+                    onChange={(e) => onChange(block.id, parseFloat(e.target.value))}
+                    className="crisis-slider relative z-20"
+                    style={{
+                      background: `linear-gradient(to right, ${trackColor} 0%, ${trackColor} ${percent}%, #1e293b ${percent}%, #1e293b 100%)`,
+                    }}
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  disabled={disabled || value >= block.max}
+                  onClick={() => handleStep(1)}
+                  className="w-8 h-8 rounded-lg bg-slate-800/90 hover:bg-slate-700 disabled:opacity-30 flex items-center justify-center text-slate-200 border border-slate-700 transition-colors shrink-0"
+                >
+                  <Icon name="Plus" className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between text-[10px] font-mono text-slate-500 mt-0.5 px-9">
+                <span>Mín: {block.min.toFixed(2)}%</span>
+                <span>Inicial: {block.initial.toFixed(2)}%</span>
+                <span>Máx: {block.max.toFixed(2)}%</span>
+              </div>
+            </div>
+          ) : null}
+
+          {isModified && (
+            <div className="mt-2.5 pt-2 border-t border-slate-800/80 flex items-center justify-between flex-wrap gap-1.5">
+              <div className="flex items-center flex-wrap gap-1.5">
+                {Math.abs(fiscalEffect) > 0.004 && (
+                  <span
+                    className={`px-2 py-0.5 rounded text-[11px] font-mono font-bold border ${
+                      fiscalEffect > 0
+                        ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                        : 'bg-rose-500/15 text-rose-300 border-rose-500/30'
+                    }`}
+                  >
+                    Caja Fiscal: {fiscalEffect > 0 ? `+${fiscalEffect.toFixed(2)}%` : `${fiscalEffect.toFixed(2)}%`} PBI
+                    {!isSpending && nominalDelta > 0 ? ' (Neto Laffer)' : ''}
+                  </span>
+                )}
+                {Math.abs(pazImpact) >= 0.5 && (
+                  <span
+                    className={`px-2 py-0.5 rounded text-[11px] font-mono font-bold border ${
+                      pazImpact > 0
+                        ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                        : 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                    }`}
+                  >
+                    Paz Social: {pazImpact > 0 ? `+${pazImpact}` : pazImpact} pts
+                  </span>
+                )}
+                {Math.abs(actImpact) >= 0.5 && (
+                  <span
+                    className={`px-2 py-0.5 rounded text-[11px] font-mono font-bold border ${
+                      actImpact > 0
+                        ? 'bg-sky-500/15 text-sky-300 border-sky-500/30'
+                        : 'bg-rose-500/15 text-rose-300 border-rose-500/30'
+                    }`}
+                  >
+                    Actividad: {actImpact > 0 ? `+${actImpact}` : actImpact} pts
+                  </span>
+                )}
+              </div>
+
+              {!block.hasDefaultButton && (
+                <button
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => onChange(block.id, block.initial)}
+                  className="inline-flex items-center gap-1 text-[11px] font-mono text-slate-400 hover:text-slate-200 px-1.5 py-0.5 rounded bg-slate-800/70 hover:bg-slate-800 transition-colors"
+                >
+                  <Icon name="RotateCcw" className="w-3 h-3" /> Reset
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    function ShockModal({ shock, onSelectChoice }) {
+      if (!shock) return null;
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md">
+          <div className="relative w-full max-w-lg rounded-2xl bg-slate-900 border-2 border-rose-500/80 shadow-[0_0_50px_rgba(225,29,72,0.45)] overflow-hidden">
+            <div className="bg-rose-600 px-4 py-2 flex items-center justify-between text-white">
+              <div className="flex items-center gap-2">
+                <Icon name="AlertOctagon" className="w-5 h-5 animate-bounce" />
+                <span className="font-mono text-xs sm:text-sm font-black tracking-wider uppercase">
+                  ALERTA DE ÚLTIMO MOMENTO · RELOJ EN PAUSA
+                </span>
+              </div>
+              <span className="text-[11px] font-mono bg-rose-950/60 px-2 py-0.5 rounded font-bold">
+                DECISIÓN OBLIGATORIA
+              </span>
+            </div>
+
+            <div className="p-5 sm:p-6">
+              <div className="flex items-start gap-3.5 mb-4">
+                <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/40 text-rose-400 shrink-0">
+                  <Icon name={shock.icon} className="w-7 h-7" />
+                </div>
+                <div>
+                  <span className="inline-block text-[11px] font-mono font-bold uppercase tracking-wider text-amber-400 mb-0.5">
+                    {shock.badge}
+                  </span>
+                  <h2 className="text-lg sm:text-xl font-black text-slate-100 leading-snug">
+                    {shock.title}
+                  </h2>
+                </div>
+              </div>
+
+              <p className="text-sm text-slate-300 leading-relaxed bg-slate-950/70 p-3.5 rounded-xl border border-slate-800 mb-5">
+                {shock.description}
+              </p>
+
+              <div className="space-y-3">
+                <p className="text-xs font-mono uppercase tracking-wider text-slate-400 font-bold">
+                  Elige tu respuesta como Ministro:
+                </p>
+                {shock.choices.map((choice) => (
+                  <button
+                    key={choice.id}
+                    onClick={() => onSelectChoice(choice)}
+                    className="w-full text-left p-3.5 sm:p-4 rounded-xl bg-slate-950 hover:bg-slate-800/90 border border-slate-700/80 hover:border-amber-400 transition-all group cursor-pointer"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-bold text-sm sm:text-base text-slate-100 group-hover:text-amber-300 transition-colors">
+                        {choice.label}
+                      </span>
+                      <Icon name="ArrowRight" className="w-4 h-4 text-slate-400 group-hover:text-amber-400 shrink-0" />
+                    </div>
+                    <p className="text-xs text-slate-400 mt-1 leading-snug">
+                      {choice.subtitle}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function EndGameModal({
+      gameStatus,
+      lossReason,
+      fiscalResult,
+      pazSocial,
+      actividad,
+      timeLeft,
+      isDefaulted,
+      totalSpending,
+      totalRevenueReal,
+      onRestart,
+    }) {
+      const [copied, setCopied] = useState(false);
+      if (gameStatus !== 'won' && gameStatus !== 'lost') return null;
+
+      const isVictory = gameStatus === 'won';
+      const timeUsed = 180 - timeLeft;
+      const minUsed = Math.floor(timeUsed / 60);
+      const secUsed = String(timeUsed % 60).padStart(2, '0');
+
+      const getArchetype = () => {
+        if (!isVictory) {
+          if (lossReason === 'paz_social') {
+            return {
+              title: 'Ministro Eyectado por Caos en la Calle',
+              desc: 'Cerraste los números en el Excel sin mirar la calle. El estallido social forzó tu renuncia antes de firmar el decreto.',
+            };
+          }
+          if (lossReason === 'actividad') {
+            return {
+              title: 'Arquitecto del Frenazo Económico Total',
+              desc: 'Asfixiaste la economía con impuestos y recortes productivos hasta provocar una depresión con caída vertical de recaudación.',
+            };
+          }
+          return {
+            title: 'Ministro Gradualista sin Tiempo',
+            desc: 'Se agotaron los 180 segundos sin llegar al equilibrio fiscal. El mercado te soltó la mano y se disparó el Riesgo País.',
+          };
+        }
+        if (isDefaulted) {
+          return {
+            title: 'Reestructurador de Trincheras',
+            desc: 'Lograste el equilibrio fiscal pateando el tablero con un Default soberano y sobreviviendo al terremoto posterior.',
+          };
+        }
+        if (totalSpending <= 16.6 && totalRevenueReal <= 16.6) {
+          return {
+            title: 'Cirujano de Motosierra Ortodoxa',
+            desc: 'Eliminaste el déficit recortando el gasto público sin subir impuestos, manteniendo a flote la gobernabilidad.',
+          };
+        }
+        if (pazSocial >= 50 && actividad >= 45) {
+          return {
+            title: 'Equilibrista Clínico de Estado',
+            desc: 'Alcanzaste el déficit cero calibrando gastos e ingresos con bisturí quirúrgico y alta estabilidad macroeconómica.',
+          };
+        }
+        return {
+          title: 'Domador de Tormentas Fiscales',
+          desc: 'Cruzaste la meta del equilibrio fiscal al límite de la resistencia social y productiva.',
+        };
+      };
+
+      const archetype = getArchetype();
+
+      const handleShare = async () => {
+        const statusEmoji = isVictory ? '🟢 ¡SUPERÁVIT / EQUILIBRIO LOGRADO!' : '🔴 RENUNCIA FORZADA';
+        const text = [
+          `🏛️ MINISTRO POR 3 MINUTOS`,
+          `${statusEmoji}`,
+          `🎖️ Perfil: ${archetype.title}`,
+          `📊 Resultado Fiscal: ${fiscalResult > 0 ? `+${fiscalResult.toFixed(2)}` : fiscalResult.toFixed(2)}% PBI`,
+          `🔥 Paz Social: ${Math.round(pazSocial)}% | 📈 Actividad: ${Math.round(actividad)}%`,
+          `⏱️ Tiempo: ${minUsed}m ${secUsed}s`,
+          `¿Puedes eliminar el déficit de -4.00% sin que estalle el país?`,
+        ].join('\n');
+
+        try {
+          await navigator.clipboard.writeText(text);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 3000);
+        } catch {}
+      };
+
+      const getLossHeadline = () => {
+        if (lossReason === 'paz_social') return 'Te pidieron la renuncia por caos en la calle';
+        if (lossReason === 'actividad') return 'Frenazo económico total y caída de recaudación';
+        return 'Se agotó el tiempo y no llegaste al Déficit Cero';
+      };
+
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-lg overflow-y-auto">
+          <div
+            className={`relative w-full max-w-lg rounded-2xl bg-slate-900 border-2 p-5 sm:p-6 shadow-2xl my-auto ${
+              isVictory
+                ? 'border-emerald-500/80 shadow-[0_0_60px_rgba(16,185,129,0.3)]'
+                : 'border-rose-500/80 shadow-[0_0_60px_rgba(225,29,72,0.35)]'
+            }`}
+          >
+            <div className="flex flex-col items-center text-center">
+              <div
+                className={`w-16 h-16 rounded-2xl flex items-center justify-center border mb-3 ${
+                  isVictory
+                    ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400'
+                    : 'bg-rose-500/15 border-rose-500/40 text-rose-400'
+                }`}
+              >
+                <Icon name={isVictory ? 'Trophy' : lossReason === 'timeout' ? 'Clock' : 'Skull'} className="w-9 h-9" />
+              </div>
+
+              <span
+                className={`px-2.5 py-0.5 rounded-full font-mono text-xs font-black uppercase tracking-wider border ${
+                  isVictory
+                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                    : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                }`}
+              >
+                {isVictory ? '¡MISIÓN CUMPLIDA · EQUILIBRIO FISCAL!' : 'FIN DE LA GESTIÓN · CRISIS TERMINAL'}
+              </span>
+
+              <h2 className="mt-2 text-xl sm:text-2xl font-black text-slate-100">
+                {isVictory ? '¡Estabilizaste las Cuentas Públicas!' : getLossHeadline()}
+              </h2>
+            </div>
+
+            <div className="mt-4 p-3.5 rounded-xl bg-slate-950/90 border border-slate-800">
+              <div className="flex items-center gap-2 text-amber-400 font-mono text-xs font-bold uppercase mb-1">
+                <Icon name="Award" className="w-4 h-4" />
+                <span>Rango de Gestión: {archetype.title}</span>
+              </div>
+              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">{archetype.desc}</p>
+            </div>
+
+            <div className="mt-4 grid grid-cols-3 gap-2.5">
+              <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 text-center">
+                <div className="text-[10px] font-mono uppercase text-slate-400">Fiscal</div>
+                <div className={`mt-1 font-mono text-base sm:text-xl font-black ${fiscalResult >= -0.001 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                  {fiscalResult > 0 ? `+${fiscalResult.toFixed(2)}%` : `${fiscalResult.toFixed(2)}%`}
+                </div>
+                <div className="text-[10px] font-mono text-slate-500">Meta: 0.00%</div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 text-center">
+                <div className="text-[10px] font-mono uppercase text-slate-400">Paz Social</div>
+                <div className={`mt-1 font-mono text-base sm:text-xl font-black ${pazSocial > 0 ? 'text-amber-400' : 'text-rose-500'}`}>
+                  {Math.round(pazSocial)}%
+                </div>
+                <div className="text-[10px] font-mono text-slate-500">Inició: 65%</div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 text-center">
+                <div className="text-[10px] font-mono uppercase text-slate-400">Actividad</div>
+                <div className={`mt-1 font-mono text-base sm:text-xl font-black ${actividad > 0 ? 'text-sky-400' : 'text-rose-500'}`}>
+                  {Math.round(actividad)}%
+                </div>
+                <div className="text-[10px] font-mono text-slate-500">Inició: 60%</div>
+              </div>
+            </div>
+
+            <div className="mt-3 px-3 py-2 rounded-lg bg-slate-950/60 border border-slate-800/80 flex items-center justify-between text-xs font-mono text-slate-400">
+              <span>Gasto: {totalSpending.toFixed(2)}% PBI</span>
+              <span>Ingresos: {totalRevenueReal.toFixed(2)}% PBI</span>
+              <span>Tiempo: {minUsed}m {secUsed}s</span>
+            </div>
+
+            <div className="mt-5 flex flex-col sm:flex-row gap-2.5">
+              <button
+                onClick={handleShare}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm uppercase tracking-wide transition-all cursor-pointer shadow-lg"
+              >
+                <Icon name={copied ? 'Check' : 'Share2'} className="w-4 h-4" />
+                <span>{copied ? '¡Copiado al Portapapeles!' : 'Compartir mi Resultado'}</span>
+              </button>
+
+              <button
+                onClick={onRestart}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 font-bold text-sm uppercase tracking-wide border border-slate-700 transition-all cursor-pointer"
+              >
+                <Icon name="RotateCcw" className="w-4 h-4" />
+                <span>Intentar de Nuevo</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function IntroModal({ onStart }) {
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md overflow-y-auto">
+          <div className="relative w-full max-w-lg rounded-2xl bg-slate-900 border border-slate-700/80 shadow-[0_0_60px_rgba(0,0,0,0.8)] overflow-hidden my-auto">
+            <div className="bg-gradient-to-r from-rose-600 via-amber-500 to-rose-600 h-1.5 w-full" />
+            <div className="p-5 sm:p-6">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-300 font-mono text-[11px] font-bold uppercase mb-3">
+                <Icon name="AlertTriangle" className="w-3.5 h-3.5 text-rose-400" />
+                Simulador de Emergencia Económica
+              </div>
+
+              <h1 className="text-2xl sm:text-3xl font-black text-slate-100 tracking-tight">
+                Ministro por <span className="text-amber-400">3 Minutos</span>
+              </h1>
+              <p className="mt-2 text-sm text-slate-300 leading-relaxed">
+                Acabas de jurar en el Palacio de Hacienda en medio de una crisis terminal. Tienes{' '}
+                <strong className="text-amber-300 font-mono">180 segundos</strong> para llevar el{' '}
+                <strong className="text-rose-400 font-mono">Déficit Fiscal de -4.00% del PBI a 0.00%</strong>{' '}
+                (o superávit) sin que estalle la calle ni se frene por completo la economía.
+              </p>
+
+              <div className="mt-4 space-y-2.5">
+                <div className="flex items-start gap-3 p-3 rounded-xl bg-slate-950/80 border border-slate-800">
+                  <Icon name="Scale" className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                  <div className="text-xs text-slate-300">
+                    <strong className="text-slate-100 block">1. Meta Fiscal: de -4.00% a 0.00% del PBI</strong>
+                    Recorta entre 8 bloques de Gasto (20.50% PBI) o sube Impuestos (16.50% PBI). Por{' '}
+                    <span className="text-sky-300 font-semibold">Efecto Laffer</span>, cada 1.00% de suba impositiva solo recauda 0.75% real neto.
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3 p-3 rounded-xl bg-slate-950/80 border border-slate-800">
+                  <Icon name="Flame" className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                  <div className="text-xs text-slate-300">
+                    <strong className="text-slate-100 block">2. Paz Social (Inicia en 65%)</strong>
+                    Recortar jubilaciones, planes, subsidios o salarios incendia la calle. Si llega a{' '}
+                    <span className="text-rose-400 font-mono font-bold">0%</span>, te piden la renuncia de inmediato.
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3 p-3 rounded-xl bg-slate-950/80 border border-slate-800">
+                  <Icon name="TrendingUp" className="w-5 h-5 text-sky-400 shrink-0 mt-0.5" />
+                  <div className="text-xs text-slate-300">
+                    <strong className="text-slate-100 block">3. Actividad Económica (Inicia en 60%)</strong>
+                    Subir impuestos, frenar obra pública o declarar el Default hunde la producción. Si llega a{' '}
+                    <span className="text-rose-400 font-mono font-bold">0%</span>, colapsa la recaudación y pierdes.
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center gap-2 text-xs text-amber-200">
+                <Icon name="Clock" className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>
+                  Prepárate: a los <strong>02:00</strong> y <strong>01:00</strong> enfrentarás shocks externos en tiempo real.
+                </span>
+              </div>
+
+              <button
+                onClick={onStart}
+                className="mt-5 w-full flex items-center justify-center gap-2 py-3.5 px-5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm sm:text-base uppercase tracking-wider shadow-[0_0_25px_rgba(245,158,11,0.4)] transition-all cursor-pointer"
+              >
+                <Icon name="Play" className="w-5 h-5" />
+                <span>Jurar como Ministro (Iniciar 03:00)</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    const buildInitialValues = () => {
+      const map = {};
+      SPENDING_BLOCKS.forEach((b) => { map[b.id] = b.initial; });
+      REVENUE_BLOCKS.forEach((b) => { map[b.id] = b.initial; });
+      return map;
+    };
+
+    function App() {
+      const [gameStatus, setGameStatus] = useState('intro');
+      const [lossReason, setLossReason] = useState(null);
+      const [timeLeft, setTimeLeft] = useState(INITIAL_STATE.timerSeconds);
+      const [values, setValues] = useState(buildInitialValues);
+      const [isDefaulted, setIsDefaulted] = useState(false);
+
+      const [activeShock, setActiveShock] = useState(null);
+      const [triggered120, setTriggered120] = useState(false);
+      const [triggered60, setTriggered60] = useState(false);
+      const [shockModifiers, setShockModifiers] = useState({ fiscal: 0, paz: 0, actividad: 0 });
+      const [shockHistory, setShockHistory] = useState([]);
+
+      const [activeTab, setActiveTab] = useState('all');
+      const [muted, setMuted] = useState(false);
+      const [latestNews, setLatestNews] = useState(
+        'ASUNCIÓN EN HACIENDA: El mercado espera señales inmediatas para revertir el déficit del -4.00% del PBI.'
+      );
+
+      const metrics = useMemo(() => {
+        const adjustableSpending = SPENDING_BLOCKS.reduce(
+          (acc, block) => acc + (values[block.id] ?? block.initial),
+          0
+        );
+        const totalSpending = adjustableSpending + INITIAL_STATE.structuralSpendingOffset;
+
+        let totalRevenueNominal = 0;
+        let totalRevenueReal = 0;
+
+        REVENUE_BLOCKS.forEach((block) => {
+          const currentVal = values[block.id] ?? block.initial;
+          totalRevenueNominal += currentVal;
+          const diff = currentVal - block.initial;
+          if (diff > 0) {
+            totalRevenueReal += block.initial + diff * INITIAL_STATE.lafferFactor;
+          } else {
+            totalRevenueReal += currentVal;
+          }
+        });
+
+        const effectiveRevenue = totalRevenueReal + shockModifiers.fiscal;
+        const fiscalResult = Number((effectiveRevenue - totalSpending).toFixed(2));
+
+        let pazDeltaTotal = shockModifiers.paz;
+        let actDeltaTotal = shockModifiers.actividad;
+
+        SPENDING_BLOCKS.forEach((block) => {
+          const impact = block.computeImpact(
+            values[block.id] ?? block.initial,
+            block.id === 'deuda' ? isDefaulted : false
+          );
+          pazDeltaTotal += impact.pazSocial;
+          actDeltaTotal += impact.actividad;
+        });
+
+        REVENUE_BLOCKS.forEach((block) => {
+          const impact = block.computeImpact(values[block.id] ?? block.initial);
+          pazDeltaTotal += impact.pazSocial;
+          actDeltaTotal += impact.actividad;
+        });
+
+        const pazSocial = Math.max(0, Math.min(100, INITIAL_STATE.basePazSocial + pazDeltaTotal));
+        const actividad = Math.max(0, Math.min(100, INITIAL_STATE.baseActividad + actDeltaTotal));
+
+        return {
+          totalSpending,
+          totalRevenueNominal,
+          totalRevenueReal: effectiveRevenue,
+          fiscalResult,
+          pazSocial,
+          actividad,
+        };
+      }, [values, isDefaulted, shockModifiers]);
+
+      const triggerVictory = useCallback(() => {
+        setGameStatus('won');
+        soundFX.playVictory();
+        if (window.confetti) {
+          window.confetti({ particleCount: 110, spread: 80, origin: { y: 0.6 } });
+        }
+      }, []);
+
+      useEffect(() => {
+        if (gameStatus !== 'playing') return;
+        if (metrics.pazSocial <= 0) {
+          setLossReason('paz_social');
+          setGameStatus('lost');
+          setActiveShock(null);
+          soundFX.playDefeat();
+        } else if (metrics.actividad <= 0) {
+          setLossReason('actividad');
+          setGameStatus('lost');
+          setActiveShock(null);
+          soundFX.playDefeat();
+        }
+      }, [metrics.pazSocial, metrics.actividad, gameStatus]);
+
+      useEffect(() => {
+        if (gameStatus !== 'playing' || activeShock !== null) return;
+        const interval = setInterval(() => {
+          setTimeLeft((prev) => {
+            if (prev <= 1) {
+              clearInterval(interval);
+              if (metrics.fiscalResult >= -0.001 && metrics.pazSocial > 0 && metrics.actividad > 0) {
+                triggerVictory();
+              } else {
+                setLossReason('timeout');
+                setGameStatus('lost');
+                soundFX.playDefeat();
+              }
+              return 0;
+            }
+            const nextTime = prev - 1;
+            if (nextTime <= 15) soundFX.playTick(760, 0.03, 0.05);
+            return nextTime;
+          });
+        }, 1000);
+        return () => clearInterval(interval);
+      }, [gameStatus, activeShock, metrics, triggerVictory]);
+
+      useEffect(() => {
+        if (gameStatus !== 'playing') return;
+        if (timeLeft === 120 && !triggered120) {
+          setTriggered120(true);
+          const randomShock = SHOCKS_AT_120[Math.floor(Math.random() * SHOCKS_AT_120.length)];
+          setActiveShock(randomShock);
+          soundFX.playShockAlert();
+        } else if (timeLeft === 60 && !triggered60) {
+          setTriggered60(true);
+          const randomShock = SHOCKS_AT_60[Math.floor(Math.random() * SHOCKS_AT_60.length)];
+          setActiveShock(randomShock);
+          soundFX.playShockAlert();
+        }
+      }, [timeLeft, triggered120, triggered60, gameStatus]);
+
+      const handleSliderChange = (blockId, newValue) => {
+        if (gameStatus !== 'playing') return;
+        const allBlocks = [...SPENDING_BLOCKS, ...REVENUE_BLOCKS];
+        const block = allBlocks.find((b) => b.id === blockId);
+        const prevValue = values[blockId];
+        setValues((prev) => ({ ...prev, [blockId]: newValue }));
+        soundFX.playTick(480 + newValue * 30, 0.02, 0.03);
+        if (block) {
+          if (newValue < prevValue && block.newsOnCut) setLatestNews(block.newsOnCut);
+          else if (newValue > prevValue && block.newsOnRaise) setLatestNews(block.newsOnRaise);
+        }
+      };
+
+      const handleDeclareDefault = () => {
+        if (gameStatus !== 'playing' || isDefaulted) return;
+        soundFX.playDefaultSiren();
+        setIsDefaulted(true);
+        setValues((prev) => ({ ...prev, deuda: 0.0 }));
+        const deudaBlock = SPENDING_BLOCKS.find((b) => b.id === 'deuda');
+        if (deudaBlock?.newsOnCut) setLatestNews(deudaBlock.newsOnCut);
+      };
+
+      const handleSelectShockChoice = (choice) => {
+        if (!activeShock) return;
+        const { fiscalDelta, pazDelta, actividadDelta, sliderAdjust, news } = choice.effects;
+        setShockModifiers((prev) => ({
+          fiscal: prev.fiscal + (fiscalDelta || 0),
+          paz: prev.paz + (pazDelta || 0),
+          actividad: prev.actividad + (actividadDelta || 0),
+        }));
+
+        if (sliderAdjust) {
+          const targetBlock = [...SPENDING_BLOCKS, ...REVENUE_BLOCKS].find((b) => b.id === sliderAdjust.blockId);
+          if (targetBlock) {
+            setValues((prev) => {
+              const updated = Math.min(
+                targetBlock.max,
+                Math.max(targetBlock.min, Number((prev[sliderAdjust.blockId] + sliderAdjust.delta).toFixed(2)))
+              );
+              return { ...prev, [sliderAdjust.blockId]: updated };
+            });
+          }
+        }
+        if (news) setLatestNews(news);
+        setShockHistory((prev) => [
+          ...prev,
+          { shockTitle: activeShock.title, choiceLabel: choice.label, time: timeLeft },
+        ]);
+        soundFX.playTick(620, 0.05, 0.07);
+        setActiveShock(null);
+      };
+
+      const handleRestart = () => {
+        soundFX.playTick(600, 0.04, 0.05);
+        setValues(buildInitialValues());
+        setIsDefaulted(false);
+        setTimeLeft(INITIAL_STATE.timerSeconds);
+        setTriggered120(false);
+        setTriggered60(false);
+        setActiveShock(null);
+        setShockModifiers({ fiscal: 0, paz: 0, actividad: 0 });
+        setShockHistory([]);
+        setLossReason(null);
+        setLatestNews('NUEVA GESTIÓN EN MARCHA: Tienes 180 segundos para llevar el déficit de -4.00% a 0.00% del PBI.');
+        setGameStatus('playing');
+      };
+
+      const handleToggleMute = () => {
+        const next = !muted;
+        setMuted(next);
+        soundFX.setMuted(next);
+      };
+
+      const isGoalMet = metrics.fiscalResult >= -0.001 && metrics.pazSocial > 0 && metrics.actividad > 0;
+
+      return (
+        <div className="min-h-screen flex flex-col pb-24">
+          <div className="scanline-overlay" />
+
+          <StickyCrisisHeader
+            timeLeft={timeLeft}
+            fiscalResult={metrics.fiscalResult}
+            totalRevenueReal={metrics.totalRevenueReal}
+            totalSpending={metrics.totalSpending}
+            pazSocial={metrics.pazSocial}
+            actividad={metrics.actividad}
+            latestNews={latestNews}
+            muted={muted}
+            onToggleMute={handleToggleMute}
+            onReset={handleRestart}
+            onConfirmVictory={triggerVictory}
+            gameStatus={gameStatus}
+          />
+
+          <main className="flex-1 max-w-5xl w-full mx-auto px-3 sm:px-6 pt-4">
+            <div className="flex lg:hidden rounded-xl bg-slate-900/90 p-1 border border-slate-800 mb-4">
+              <button
+                onClick={() => setActiveTab('all')}
+                className={`flex-1 py-2 rounded-lg text-xs font-mono font-bold uppercase transition-all flex items-center justify-center gap-1 ${
+                  activeTab === 'all' ? 'bg-slate-800 text-amber-400 shadow' : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Icon name="Layers" className="w-3.5 h-3.5" />
+                <span>Todo</span>
+              </button>
+              <button
+                onClick={() => setActiveTab('spending')}
+                className={`flex-1 py-2 rounded-lg text-xs font-mono font-bold uppercase transition-all flex items-center justify-center gap-1 ${
+                  activeTab === 'spending'
+                    ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30 shadow'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Icon name="Scissors" className="w-3.5 h-3.5" />
+                <span>Gastos ({metrics.totalSpending.toFixed(2)}%)</span>
+              </button>
+              <button
+                onClick={() => setActiveTab('revenue')}
+                className={`flex-1 py-2 rounded-lg text-xs font-mono font-bold uppercase transition-all flex items-center justify-center gap-1 ${
+                  activeTab === 'revenue'
+                    ? 'bg-sky-500/20 text-sky-300 border border-sky-500/30 shadow'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Icon name="Landmark" className="w-3.5 h-3.5" />
+                <span>Impuestos ({metrics.totalRevenueReal.toFixed(2)}%)</span>
+              </button>
+            </div>
+
+            {shockHistory.length > 0 && (
+              <div className="mb-4 flex flex-wrap items-center gap-2 p-2.5 rounded-xl bg-rose-950/30 border border-rose-500/30">
+                <span className="text-[11px] font-mono font-bold uppercase text-rose-300 flex items-center gap-1">
+                  Shocks Enfrentados:
+                </span>
+                {shockHistory.map((item, idx) => (
+                  <span
+                    key={idx}
+                    className="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-900/90 text-slate-300 border border-slate-700"
+                  >
+                    {item.shockTitle}: <strong className="text-amber-300">{item.choiceLabel}</strong>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+              <section className={`lg:col-span-7 space-y-3 ${activeTab === 'revenue' ? 'hidden lg:block' : 'block'}`}>
+                <div className="flex items-center justify-between p-3 rounded-xl bg-slate-900/90 border border-rose-500/30">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 rounded-lg bg-rose-500/15 text-rose-400">
+                      <Icon name="TrendingDown" className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h2 className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-100">
+                        A. Bloques de Gasto Público
+                      </h2>
+                      <p className="text-[11px] text-slate-400">
+                        Proporciones Sector Público Nacional (OPC · Incluye 1.00% PBI rígido)
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right font-mono">
+                    <span className="text-sm sm:text-base font-black text-rose-400">
+                      {metrics.totalSpending.toFixed(2)}% PBI
+                    </span>
+                    <span className="block text-[10px] text-slate-500">Inicial: 20.50% PBI</span>
+                  </div>
+                </div>
+
+                <div className="space-y-2.5">
+                  {SPENDING_BLOCKS.map((block) => (
+                    <BudgetSliderCard
+                      key={block.id}
+                      block={block}
+                      value={values[block.id]}
+                      isDefaulted={isDefaulted}
+                      onChange={handleSliderChange}
+                      onDeclareDefault={handleDeclareDefault}
+                      disabled={gameStatus !== 'playing'}
+                    />
+                  ))}
+                </div>
+              </section>
+
+              <section className={`lg:col-span-5 space-y-3 ${activeTab === 'spending' ? 'hidden lg:block' : 'block'}`}>
+                <div className="flex items-center justify-between p-3 rounded-xl bg-slate-900/90 border border-sky-500/30">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 rounded-lg bg-sky-500/15 text-sky-400">
+                      <Icon name="TrendingUp" className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h2 className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-100">
+                        B. Bloques de Ingresos / Impuestos
+                      </h2>
+                      <p className="text-[11px] text-slate-400">
+                        Efecto Laffer: cada +1.00% de suba recauda +0.75% real neto
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right font-mono">
+                    <span className="text-sm sm:text-base font-black text-sky-400">
+                      {metrics.totalRevenueReal.toFixed(2)}% PBI
+                    </span>
+                    <span className="block text-[10px] text-slate-500">Inicial: 16.50% PBI</span>
+                  </div>
+                </div>
+
+                <div className="space-y-2.5">
+                  {REVENUE_BLOCKS.map((block) => (
+                    <BudgetSliderCard
+                      key={block.id}
+                      block={block}
+                      value={values[block.id]}
+                      isDefaulted={false}
+                      onChange={handleSliderChange}
+                      onDeclareDefault={() => {}}
+                      disabled={gameStatus !== 'playing'}
+                    />
+                  ))}
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 text-xs text-slate-300 space-y-1.5">
+                  <div className="flex items-center gap-1.5 text-amber-400 font-mono font-bold uppercase text-[11px]">
+                    <Icon name="AlertTriangle" className="w-3.5 h-3.5" />
+                    <span>Informe Reservado del Viceministro</span>
+                  </div>
+                  <p className="leading-relaxed text-slate-400">
+                    Recortar <strong className="text-slate-200">Cargos Políticos</strong> te da aire en la opinión pública (+10 Paz Social), pero apenas ahorra 0.13% del PBI. Para cerrar la brecha de <strong className="text-rose-400">-4.00%</strong> deberás combinar recortes estructurales sin apagar el motor productivo.
+                  </p>
+                </div>
+              </section>
+            </div>
+          </main>
+
+          {isGoalMet && gameStatus === 'playing' && (
+            <div className="fixed bottom-0 inset-x-0 z-40 p-3 bg-slate-950/95 border-t border-emerald-500/50 backdrop-blur-lg shadow-[0_-10px_30px_rgba(16,185,129,0.2)]">
+              <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-emerald-300 text-xs sm:text-sm font-medium">
+                  <Icon name="Sparkles" className="w-5 h-5 text-emerald-400 shrink-0 animate-spin" />
+                  <span>
+                    ¡Alcanzaste el equilibrio fiscal (
+                    <strong className="font-mono">
+                      {metrics.fiscalResult > 0 ? `+${metrics.fiscalResult.toFixed(2)}%` : `${metrics.fiscalResult.toFixed(2)}%`} PBI
+                    </strong>
+                    )! Puedes firmar el decreto ahora o seguir optimizando.
+                  </span>
+                </div>
+                <button
+                  onClick={triggerVictory}
+                  className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs sm:text-sm uppercase tracking-wider shadow-[0_0_25px_rgba(16,185,129,0.6)] transition-all cursor-pointer shrink-0"
+                >
+                  <Icon name="CheckCircle2" className="w-4 h-4" />
+                  <span>Consolidar Equilibrio y Ganar</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {gameStatus === 'intro' && (
+            <IntroModal
+              onStart={() => {
+                soundFX.playTick(660, 0.06, 0.08);
+                setGameStatus('playing');
+              }}
+            />
+          )}
+
+          <ShockModal shock={activeShock} onSelectChoice={handleSelectShockChoice} />
+
+          <EndGameModal
+            gameStatus={gameStatus}
+            lossReason={lossReason}
+            fiscalResult={metrics.fiscalResult}
+            pazSocial={metrics.pazSocial}
+            actividad={metrics.actividad}
+            timeLeft={timeLeft}
+            isDefaulted={isDefaulted}
+            totalSpending={metrics.totalSpending}
+            totalRevenueReal={metrics.totalRevenueReal}
+            onRestart={handleRestart}
+          />
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>

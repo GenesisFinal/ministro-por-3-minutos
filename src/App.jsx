@@ -16,7 +16,7 @@ import {
   SPENDING_BLOCKS,
   REVENUE_BLOCKS,
 } from './data/budgetConfig';
-import { SHOCKS_AT_120, SHOCKS_AT_60 } from './data/shocksConfig';
+import { generateRandomShockSchedule } from './data/shocksConfig';
 import StickyCrisisHeader from './components/StickyCrisisHeader';
 import BudgetSliderCard from './components/BudgetSliderCard';
 import ShockModal from './components/ShockModal';
@@ -42,10 +42,11 @@ export default function App() {
   const [values, setValues] = useState(buildInitialValues);
   const [isDefaulted, setIsDefaulted] = useState(false);
 
-  // Shocks state
+  // Random Shocks state (both positive & negative at random times)
+  const [shockSchedule, setShockSchedule] = useState(() =>
+    generateRandomShockSchedule()
+  );
   const [activeShock, setActiveShock] = useState(null);
-  const [triggered120, setTriggered120] = useState(false);
-  const [triggered60, setTriggered60] = useState(false);
   const [shockModifiers, setShockModifiers] = useState({
     fiscal: 0,
     paz: 0,
@@ -158,7 +159,7 @@ export default function App() {
     }
   }, [metrics.pazSocial, metrics.actividad, gameStatus]);
 
-  // 180-second Countdown & Real-Time Shock Dispatcher (120s and 60s)
+  // 180-second Countdown
   useEffect(() => {
     if (gameStatus !== 'playing' || activeShock !== null) return;
 
@@ -166,7 +167,6 @@ export default function App() {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(interval);
-          // Evaluate at 00:00
           if (
             metrics.fiscalResult >= -0.001 &&
             metrics.pazSocial > 0 &&
@@ -191,24 +191,29 @@ export default function App() {
     return () => clearInterval(interval);
   }, [gameStatus, activeShock, metrics, triggerVictory]);
 
-  // Trigger Shocks at 120s and 60s
+  // Trigger Random-Time Shocks (Positive & Negative)
   useEffect(() => {
-    if (gameStatus !== 'playing') return;
+    if (gameStatus !== 'playing' || activeShock !== null) return;
 
-    if (timeLeft === 120 && !triggered120) {
-      setTriggered120(true);
-      const randomShock =
-        SHOCKS_AT_120[Math.floor(Math.random() * SHOCKS_AT_120.length)];
-      setActiveShock(randomShock);
-      soundFX.playShockAlert();
-    } else if (timeLeft === 60 && !triggered60) {
-      setTriggered60(true);
-      const randomShock =
-        SHOCKS_AT_60[Math.floor(Math.random() * SHOCKS_AT_60.length)];
-      setActiveShock(randomShock);
-      soundFX.playShockAlert();
+    const dueIndex = shockSchedule.findIndex(
+      (item) => !item.triggered && timeLeft === item.triggerTime
+    );
+
+    if (dueIndex !== -1) {
+      const dueItem = shockSchedule[dueIndex];
+      setShockSchedule((prev) =>
+        prev.map((item, idx) =>
+          idx === dueIndex ? { ...item, triggered: true } : item
+        )
+      );
+      setActiveShock(dueItem.shock);
+      if (dueItem.shock.type === 'positive') {
+        soundFX.playPositiveShock();
+      } else {
+        soundFX.playShockAlert();
+      }
     }
-  }, [timeLeft, triggered120, triggered60, gameStatus]);
+  }, [timeLeft, shockSchedule, gameStatus, activeShock]);
 
   // Handlers
   const handleSliderChange = (blockId, newValue) => {
@@ -285,6 +290,7 @@ export default function App() {
       ...prev,
       {
         shockTitle: activeShock.title,
+        shockType: activeShock.type,
         choiceLabel: choice.label,
         time: timeLeft,
       },
@@ -299,8 +305,7 @@ export default function App() {
     setValues(buildInitialValues());
     setIsDefaulted(false);
     setTimeLeft(INITIAL_STATE.timerSeconds);
-    setTriggered120(false);
-    setTriggered60(false);
+    setShockSchedule(generateRandomShockSchedule());
     setActiveShock(null);
     setShockModifiers({ fiscal: 0, paz: 0, actividad: 0 });
     setShockHistory([]);
@@ -383,17 +388,22 @@ export default function App() {
 
         {/* Shock History Pills (if any occurred) */}
         {shockHistory.length > 0 && (
-          <div className="mb-4 flex flex-wrap items-center gap-2 p-2.5 rounded-xl bg-rose-950/30 border border-rose-500/30">
-            <span className="text-[11px] font-mono font-bold uppercase text-rose-300 flex items-center gap-1">
-              <ShieldAlert className="w-3.5 h-3.5 text-rose-400" />
-              Shocks Enfrentados:
+          <div className="mb-4 flex flex-wrap items-center gap-2 p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
+            <span className="text-[11px] font-mono font-bold uppercase text-slate-300 flex items-center gap-1">
+              <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />
+              Shocks del Mandato:
             </span>
             {shockHistory.map((item, idx) => (
               <span
                 key={idx}
-                className="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-900/90 text-slate-300 border border-slate-700"
+                className={`text-[11px] font-mono px-2 py-0.5 rounded border ${
+                  item.shockType === 'positive'
+                    ? 'bg-emerald-950/50 text-emerald-200 border-emerald-500/40'
+                    : 'bg-rose-950/50 text-rose-200 border-rose-500/40'
+                }`}
               >
-                {item.shockTitle}: <strong className="text-amber-300">{item.choiceLabel}</strong>
+                {item.shockType === 'positive' ? '🟢 ' : '🔴 '}
+                {item.shockTitle}: <strong>{item.choiceLabel}</strong>
               </span>
             ))}
           </div>
@@ -497,7 +507,7 @@ export default function App() {
                 <span>Informe Reservado del Viceministro</span>
               </div>
               <p className="leading-relaxed text-slate-400">
-                La motosierra sobre <strong className="text-slate-200">Cargos Políticos</strong> te da aire en la opinión pública (+10 Paz Social), pero solo ahorra 0.13% del PBI. Para cerrar la brecha de <strong className="text-rose-400">-4.00%</strong> deberás combinar recortes estructurales sin apagar el motor productivo.
+                La motosierra sobre <strong className="text-slate-200">Cargos Políticos</strong> te da aire en la opinión pública (+10 Paz Social), pero solo ahorra 0.13% del PBI. Mantén margen de seguridad: los shocks externos caen sin aviso previo.
               </p>
             </div>
           </section>
@@ -537,6 +547,7 @@ export default function App() {
         <IntroModal
           onStart={() => {
             soundFX.playTick(660, 0.06, 0.08);
+            setShockSchedule(generateRandomShockSchedule());
             setGameStatus('playing');
           }}
         />

@@ -1,0 +1,94 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    background-color: #020617;
+    background-image: 
+      radial-gradient(at 50% 0%, rgba(30, 41, 59, 0.5) 0px, transparent 60%),
+      linear-gradient(to right, rgba(30, 41, 59, 0.18) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(30, 41, 59, 0.18) 1px, transparent 1px);
+    background-size: 100% 100%, 28px 28px, 28px 28px;
+  }
+}
+
+/* Custom Range Slider Styling for Mobile & Desktop */
+input[type="range"].crisis-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 10px;
+  border-radius: 9999px;
+  outline: none;
+  cursor: pointer;
+  touch-action: pan-y;
+}
+
+input[type="range"].crisis-slider:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+input[type="range"].crisis-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #f8fafc;
+  border: 3px solid #0f172a;
+  box-shadow: 0 0 0 2px rgba(248, 250, 252, 0.4), 0 4px 10px rgba(0, 0, 0, 0.6);
+  cursor: grab;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background-color 0.12s ease;
+}
+
+input[type="range"].crisis-slider:active::-webkit-slider-thumb {
+  cursor: grabbing;
+  transform: scale(1.16);
+  background: #fbbf24;
+  box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.35), 0 4px 12px rgba(0, 0, 0, 0.8);
+}
+
+input[type="range"].crisis-slider::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #f8fafc;
+  border: 3px solid #0f172a;
+  box-shadow: 0 0 0 2px rgba(248, 250, 252, 0.4), 0 4px 10px rgba(0, 0, 0, 0.6);
+  cursor: grab;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+input[type="range"].crisis-slider:active::-moz-range-thumb {
+  cursor: grabbing;
+  transform: scale(1.16);
+  background: #fbbf24;
+}
+
+@keyframes scanline {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(1000%);
+  }
+}
+
+.scanline-overlay {
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(255, 255, 255, 0.02) 50%,
+    transparent 100%
+  );
+  height: 80px;
+  width: 100%;
+  position: fixed;
+  top: 0;
+  left: 0;
+  animation: scanline 9s linear infinite;
+  z-index: 50;
+}

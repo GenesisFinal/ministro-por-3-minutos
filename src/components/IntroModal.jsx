@@ -5,7 +5,7 @@ export default function IntroModal({ onStart }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md overflow-y-auto">
       <div className="relative w-full max-w-lg rounded-2xl bg-slate-900 border border-slate-700/80 shadow-[0_0_60px_rgba(0,0,0,0.8)] overflow-hidden my-auto">
-        <div className="bg-gradient-to-r from-rose-600 via-amber-500 to-rose-600 h-1.5 w-full" />
+        <div className="bg-gradient-to-r from-rose-600 via-amber-500 to-emerald-500 h-1.5 w-full" />
 
         <div className="p-5 sm:p-6">
           <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-300 font-mono text-[11px] font-bold uppercase mb-3">
@@ -56,7 +56,9 @@ export default function IntroModal({ onStart }) {
           <div className="mt-4 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center gap-2 text-xs text-amber-200">
             <Clock className="w-4 h-4 text-amber-400 shrink-0" />
             <span>
-              Prepárate: a los <strong>02:00</strong> y <strong>01:00</strong> enfrentarás shocks externos en tiempo real.
+              <strong>Shocks Imprevistos:</strong> En momentos aleatorios caerán shocks externos tanto{' '}
+              <span className="text-emerald-300 font-semibold">positivos (viento de cola)</span> como{' '}
+              <span className="text-rose-300 font-semibold">negativos (crisis)</span>.
             </span>
           </div>
 
